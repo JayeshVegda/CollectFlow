@@ -32,8 +32,12 @@ class CashCollectApplication : Application() {
         backupManager = EncryptedBackupManager(this, database)
         csvExporter = CsvExporter(this)
 
-        // Schedule periodic reminder check for unconfirmed collections
-        UnconfirmedReminderWorker.schedule(this)
+        // Schedule periodic reminder check for unconfirmed collections safely
+        try {
+            UnconfirmedReminderWorker.schedule(this)
+        } catch (e: Throwable) {
+            android.util.Log.e("CashCollectApp", "Failed to schedule periodic reminder worker", e)
+        }
     }
 
     companion object {
