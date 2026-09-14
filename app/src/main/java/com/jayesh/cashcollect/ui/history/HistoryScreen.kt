@@ -142,8 +142,16 @@ fun HistoryScreen(
                     onClick = { selectedStatus = null },
                     label = { Text("ALL", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
                     colors = FilterChipDefaults.filterChipColors(
+                        containerColor = NothingCard,
+                        labelColor = NothingGray,
                         selectedContainerColor = NothingWhite,
                         selectedLabelColor = Color.Black
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selectedStatus == null,
+                        borderColor = NothingBorderVisible,
+                        selectedBorderColor = NothingWhite
                     )
                 )
 
@@ -155,8 +163,16 @@ fun HistoryScreen(
                         },
                         label = { Text(status.name, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
+                            containerColor = NothingCard,
+                            labelColor = NothingGray,
                             selectedContainerColor = NothingWhite,
                             selectedLabelColor = Color.Black
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = selectedStatus == status,
+                            borderColor = NothingBorderVisible,
+                            selectedBorderColor = NothingWhite
                         )
                     )
                 }

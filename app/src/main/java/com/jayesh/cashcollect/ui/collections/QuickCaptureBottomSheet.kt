@@ -37,7 +37,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,8 +44,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -80,16 +77,6 @@ fun QuickCaptureBottomSheet(
     var rawInput by remember { mutableStateOf("") }
     var noteInput by remember { mutableStateOf("") }
     val parsedResult = remember(rawInput) { SmartInputParser.parse(rawInput) }
-
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(Unit) {
-        // Automatically request focus for keyboard on open
-        kotlinx.coroutines.delay(100)
-        try {
-            focusRequester.requestFocus()
-        } catch (e: Exception) {}
-    }
 
     val isValid = parsedResult != null &&
             parsedResult.customerName.isNotBlank() &&
@@ -169,9 +156,7 @@ fun QuickCaptureBottomSheet(
             OutlinedTextField(
                 value = rawInput,
                 onValueChange = { rawInput = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
+                modifier = Modifier.fillMaxWidth(),
                 placeholder = {
                     Text(
                         "party name + amount...",
@@ -405,7 +390,8 @@ fun QuickCaptureBottomSheet(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    color = if (isValid) Color.Black else NothingMuted
                 )
             }
 

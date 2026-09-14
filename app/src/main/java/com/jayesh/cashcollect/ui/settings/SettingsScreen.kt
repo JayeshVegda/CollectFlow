@@ -63,6 +63,7 @@ import com.jayesh.cashcollect.ui.theme.NothingAmberBg
 import com.jayesh.cashcollect.ui.theme.NothingAmberBorder
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingCardRaised
 import com.jayesh.cashcollect.ui.theme.NothingGray
@@ -435,11 +436,14 @@ fun SettingsScreen(
     if (showSavedMessage) {
         AlertDialog(
             onDismissRequest = { showSavedMessage = false },
-            title = { Text("SETTINGS SAVED", fontFamily = FontFamily.Monospace) },
+            containerColor = NothingCardRaised,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
+            title = { Text("SETTINGS SAVED", fontFamily = FontFamily.Monospace, color = NothingWhite) },
             text = { Text("Settings have been updated successfully.", color = NothingGray) },
             confirmButton = {
                 TextButton(onClick = { showSavedMessage = false }) {
-                    Text("OK", color = NothingRed)
+                    Text("OK", color = NothingRed, fontWeight = FontWeight.Bold)
                 }
             }
         )

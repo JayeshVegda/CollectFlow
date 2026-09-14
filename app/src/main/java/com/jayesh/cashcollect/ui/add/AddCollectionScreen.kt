@@ -430,7 +430,8 @@ fun AddCollectionScreen(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    color = if (selectedCustomer != null && amountPaise > 0L) Color.Black else NothingMuted
                 )
             }
 
@@ -442,17 +443,20 @@ fun AddCollectionScreen(
     if (showNewCustomerDialog) {
         AlertDialog(
             onDismissRequest = { showNewCustomerDialog = false },
-            title = { Text("NEW PARTY", fontFamily = FontFamily.Monospace) },
+            containerColor = NothingCardRaised,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
+            title = { Text("NEW PARTY", fontFamily = FontFamily.Monospace, color = NothingWhite) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = newCustomerName,
                         onValueChange = { newCustomerName = it },
-                        label = { Text("Party Name *") },
+                        label = { Text("Party Name *", color = NothingGray) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = NothingRed,
-                            unfocusedBorderColor = NothingBorder,
+                            unfocusedBorderColor = NothingBorderVisible,
                             focusedTextColor = NothingWhite,
                             unfocusedTextColor = NothingWhite
                         )
@@ -460,11 +464,11 @@ fun AddCollectionScreen(
                     OutlinedTextField(
                         value = newCustomerAlias,
                         onValueChange = { newCustomerAlias = it },
-                        label = { Text("Area / Shop Alias") },
+                        label = { Text("Area / Shop Alias", color = NothingGray) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = NothingRed,
-                            unfocusedBorderColor = NothingBorder,
+                            unfocusedBorderColor = NothingBorderVisible,
                             focusedTextColor = NothingWhite,
                             unfocusedTextColor = NothingWhite
                         )
@@ -479,14 +483,18 @@ fun AddCollectionScreen(
                             showNewCustomerDialog = false
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = NothingRed)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NothingWhite,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(999.dp)
                 ) {
-                    Text("SAVE", fontFamily = FontFamily.Monospace)
+                    Text("SAVE", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color.Black)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showNewCustomerDialog = false }) {
-                    Text("CANCEL", color = NothingGray)
+                    Text("CANCEL", fontFamily = FontFamily.Monospace, color = NothingGray)
                 }
             }
         )
@@ -496,12 +504,15 @@ fun AddCollectionScreen(
     if (showDuplicateWarningDialog) {
         AlertDialog(
             onDismissRequest = { showDuplicateWarningDialog = false },
+            containerColor = NothingCardRaised,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
             icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = NothingAmber) },
-            title = { Text("DUPLICATE WARNING", fontFamily = FontFamily.Monospace) },
+            title = { Text("DUPLICATE WARNING", fontFamily = FontFamily.Monospace, color = NothingWhite) },
             text = {
                 Text(
                     "A collection for ${selectedCustomer?.displayName} of ${Paise(amountPaise).toFormattedRupees()} was already recorded within the last 30 minutes.\n\nSave anyway?",
-                    color = NothingGray
+                    color = NothingTextPrimary
                 )
             },
             confirmButton = {
@@ -510,14 +521,18 @@ fun AddCollectionScreen(
                         showDuplicateWarningDialog = false
                         pendingSaveAction?.invoke()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = NothingAmber)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NothingAmber,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(999.dp)
                 ) {
-                    Text("SAVE ANYWAY", fontFamily = FontFamily.Monospace)
+                    Text("SAVE ANYWAY", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color.Black)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDuplicateWarningDialog = false }) {
-                    Text("CANCEL", color = NothingGray)
+                    Text("CANCEL", fontFamily = FontFamily.Monospace, color = NothingGray)
                 }
             }
         )

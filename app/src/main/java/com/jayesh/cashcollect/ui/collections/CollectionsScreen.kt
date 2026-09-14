@@ -1,5 +1,6 @@
 package com.jayesh.cashcollect.ui.collections
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -80,6 +81,7 @@ fun CollectionsScreen(
     pendingList: List<CollectionItem>,
     commissionRatePerThousand: Int,
     initialOpenQuickCapture: Boolean = false,
+    onQuickCaptureDismissed: () -> Unit = {},
     onAddCollectionClick: () -> Unit,
     onQuickCaptureSave: (customerName: String, amountPaise: Long, note: String?) -> Unit,
     onCollectionClick: (Long) -> Unit,
@@ -100,6 +102,16 @@ fun CollectionsScreen(
     var selectedItemForConfirm by remember { mutableStateOf<CollectionItem?>(null) }
     val confirmSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+
+    // BackHandler ensures pressing Back closes sheets cleanly without exiting or triggering navigation loops
+    BackHandler(enabled = isQuickCaptureOpen) {
+        isQuickCaptureOpen = false
+        onQuickCaptureDismissed()
+    }
+
+    BackHandler(enabled = selectedItemForConfirm != null) {
+        selectedItemForConfirm = null
+    }
 
     Scaffold(
         containerColor = NothingBlack,
@@ -172,7 +184,8 @@ fun CollectionsScreen(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
-                    letterSpacing = 0.8.sp
+                    letterSpacing = 0.8.sp,
+                    color = Color.Black
                 )
             }
         }
@@ -185,66 +198,6 @@ fun CollectionsScreen(
             contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Sleek Quick Action Bar Trigger
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .border(1.dp, NothingBorderVisible, RoundedCornerShape(14.dp))
-                        .background(NothingCard)
-                        .clickable { isQuickCaptureOpen = true }
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(NothingRed)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "SMART QUICK CAPTURE",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp,
-                                    color = NothingWhite
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(3.dp))
-                            Text(
-                                text = "e.g. \"sambhu 400\" or \"mahesh 1.5L\"",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                color = NothingGray
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(NothingWhite)
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = "POPUP",
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                color = Color.Black
-                            )
-                        }
-                    }
-                }
-            }
 
             // 2. OUTSTANDING CONFIRMATIONS (Warning Amber)
             if (outstandingList.isNotEmpty()) {
@@ -315,13 +268,18 @@ fun CollectionsScreen(
         QuickCaptureBottomSheet(
             sheetState = quickCaptureSheetState,
             commissionRatePerThousand = commissionRatePerThousand,
-            onDismiss = { isQuickCaptureOpen = false },
+            onDismiss = {
+                isQuickCaptureOpen = false
+                onQuickCaptureDismissed()
+            },
             onConfirmSave = { name, amountPaise, note ->
                 isQuickCaptureOpen = false
+                onQuickCaptureDismissed()
                 onQuickCaptureSave(name, amountPaise, note)
             },
             onOpenFullForm = {
                 isQuickCaptureOpen = false
+                onQuickCaptureDismissed()
                 onAddCollectionClick()
             }
         )

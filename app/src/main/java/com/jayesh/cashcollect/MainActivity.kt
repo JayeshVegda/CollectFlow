@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -100,6 +101,15 @@ class MainActivity : ComponentActivity() {
                             else -> Screen.Collections
                         }
                     )
+                }
+
+                var shouldOpenQuickCapture by remember {
+                    mutableStateOf(openQuickCaptureDirectly)
+                }
+
+                // Predictable back handling: return to Collections tab if currently on subscreen
+                BackHandler(enabled = currentScreen !is Screen.Collections) {
+                    currentScreen = Screen.Collections
                 }
 
                 val outstandingList by collectionRepo.getOutstandingConfirmations()
@@ -243,7 +253,11 @@ class MainActivity : ComponentActivity() {
                                     outstandingList = outstandingList,
                                     pendingList = pendingList,
                                     commissionRatePerThousand = appSettings.commissionRatePerThousand,
-                                    initialOpenQuickCapture = openQuickCaptureDirectly,
+                                    initialOpenQuickCapture = shouldOpenQuickCapture,
+                                    onQuickCaptureDismissed = {
+                                        shouldOpenQuickCapture = false
+                                        intent.removeExtra("EXTRA_OPEN_QUICK_CAPTURE")
+                                    },
                                     onAddCollectionClick = { currentScreen = Screen.AddCollection },
                                     onQuickCaptureSave = { name, amountPaise, note ->
                                         scope.launch {

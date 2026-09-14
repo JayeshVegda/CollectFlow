@@ -376,7 +376,10 @@ fun CollectionDetailScreen(
     if (showVoidDialog) {
         AlertDialog(
             onDismissRequest = { showVoidDialog = false },
-            title = { Text("CORRECT ENTRY #${collection.id}", fontFamily = FontFamily.Monospace) },
+            containerColor = NothingCardRaised,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
+            title = { Text("CORRECT ENTRY #${collection.id}", fontFamily = FontFamily.Monospace, color = NothingWhite) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -431,9 +434,12 @@ fun CollectionDetailScreen(
                             onVoidAndReplace(collection.id, voidReason, newAmt * 100L, newNote)
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = NothingRed)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NothingRed,
+                        contentColor = NothingWhite
+                    )
                 ) {
-                    Text("VOID & REPLACE", fontFamily = FontFamily.Monospace)
+                    Text("VOID & REPLACE", fontFamily = FontFamily.Monospace, color = NothingWhite, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
