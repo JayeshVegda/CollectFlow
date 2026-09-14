@@ -3,9 +3,13 @@ name: Build CollectFlow Debug APK
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -32,9 +36,25 @@ jobs:
       - name: Assemble Debug APK
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: Prepare APK for Release
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/CollectFlow-debug.apk
+
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: CollectFlow-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/CollectFlow-debug.apk
           retention-days: 30
+
+      - name: Publish to GitHub Releases (Direct One-Click Download)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: "CollectFlow v1.0.0"
+          body: |
+            ### 📱 Download for Android Phone
+            Tap the **`CollectFlow-debug.apk`** file below to download and install directly on your phone (no unzipping needed!).
+          files: app/build/outputs/apk/debug/CollectFlow-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
