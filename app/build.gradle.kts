@@ -88,6 +88,8 @@ dependencies {
 
     // Jetpack Security for encrypted AES-256 backup export/import
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    compileOnly("com.google.errorprone:error_prone_annotations:2.20.0")
+    compileOnly("com.google.code.findbugs:jsr305:3.0.2")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
