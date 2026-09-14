@@ -33,10 +33,16 @@ class SettingsRepository(private val settingsDao: SettingsDao) {
         settingsDao.updateLastBackupTimestamp(timestamp)
     }
 
+    suspend fun updateMessageTemplate(template: String) {
+        val current = settingsDao.getSettingsSync() ?: SettingsEntity()
+        settingsDao.insertOrUpdate(current.copy(messageTemplate = template.trim()))
+    }
+
     private fun SettingsEntity.toDomain() = AppSettings(
         id = id,
         brotherWhatsAppNumber = brotherWhatsAppNumber,
         commissionRatePerThousand = commissionRatePerThousand,
-        lastBackupAt = lastBackupAt
+        lastBackupAt = lastBackupAt,
+        messageTemplate = messageTemplate
     )
 }

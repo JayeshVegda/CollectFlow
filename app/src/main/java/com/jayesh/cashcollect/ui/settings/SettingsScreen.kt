@@ -1,8 +1,13 @@
 package com.jayesh.cashcollect.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,23 +49,34 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jayesh.cashcollect.domain.model.AppSettings
-import com.jayesh.cashcollect.ui.theme.AmberWarning
-import com.jayesh.cashcollect.ui.theme.AmberWarningBg
-import com.jayesh.cashcollect.ui.theme.GreenPrimary
+import com.jayesh.cashcollect.domain.template.MessageTemplateEngine
+import com.jayesh.cashcollect.ui.theme.NothingAmber
+import com.jayesh.cashcollect.ui.theme.NothingAmberBg
+import com.jayesh.cashcollect.ui.theme.NothingAmberBorder
+import com.jayesh.cashcollect.ui.theme.NothingBlack
+import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingCard
+import com.jayesh.cashcollect.ui.theme.NothingCardRaised
+import com.jayesh.cashcollect.ui.theme.NothingGray
+import com.jayesh.cashcollect.ui.theme.NothingMuted
+import com.jayesh.cashcollect.ui.theme.NothingRed
+import com.jayesh.cashcollect.ui.theme.NothingWhite
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
     onSaveNumber: (String) -> Unit,
+    onSaveTemplate: (String) -> Unit,
     onSaveRate: (Int) -> Unit,
     onBackupNow: () -> Unit,
     onRestoreBackupClick: () -> Unit,
@@ -68,26 +85,39 @@ fun SettingsScreen(
     var brotherNumber by remember(settings.brotherWhatsAppNumber) {
         mutableStateOf(settings.brotherWhatsAppNumber)
     }
+    var messageTemplate by remember(settings.messageTemplate) {
+        mutableStateOf(if (settings.messageTemplate.isNotBlank()) settings.messageTemplate else MessageTemplateEngine.DEFAULT_TEMPLATE)
+    }
     var commissionRateText by remember(settings.commissionRatePerThousand) {
         mutableStateOf(settings.commissionRatePerThousand.toString())
     }
     var showSavedMessage by remember { mutableStateOf(false) }
+
+    val previewMessage = remember(messageTemplate) {
+        MessageTemplateEngine.preview(messageTemplate)
+    }
 
     val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = "SETTINGS",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = NothingWhite
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = NothingWhite)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = GreenPrimary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                    containerColor = NothingBlack
                 )
             )
         }
@@ -97,30 +127,45 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. BROTHER'S WHATSAPP NUMBER
+            // 1. RECIPIENT WHATSAPP NUMBER
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, NothingBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = NothingCard),
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(text = "WhatsApp Integration", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(
-                        text = "Phone number of your brother/counterparty receiving cash collection receipts (include country code, e.g. +919876543210):",
-                        fontSize = 13.sp,
-                        color = Color.DarkGray
+                        text = "WHATSAPP RECIPIENT",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp,
+                        color = NothingGray
+                    )
+                    Text(
+                        text = "Number that will receive the cash receipt (e.g. +919510233829):",
+                        fontSize = 12.sp,
+                        color = NothingGray
                     )
 
                     OutlinedTextField(
                         value = brotherNumber,
                         onValueChange = { brotherNumber = it },
-                        label = { Text("WhatsApp Phone Number") },
+                        placeholder = { Text("+919510233829", color = NothingMuted) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingRed,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
                     )
 
                     Button(
@@ -128,43 +173,156 @@ fun SettingsScreen(
                             onSaveNumber(brotherNumber)
                             showSavedMessage = true
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
-                        modifier = Modifier.align(Alignment.End)
+                        colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                        modifier = Modifier.align(Alignment.End),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null)
+                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Save Number")
+                        Text("SAVE NUMBER", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.White)
                     }
                 }
             }
 
-            // 2. COMMISSION RATE
+            // 2. CUSTOMIZABLE MESSAGE TEMPLATE & LIVE PREVIEW
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, NothingBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = NothingCard),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "MESSAGE FORMAT TEMPLATE",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp,
+                        color = NothingGray
+                    )
+
+                    Text(
+                        text = "Tap a tag below to insert it into your message format:",
+                        fontSize = 12.sp,
+                        color = NothingGray
+                    )
+
+                    // Clickable Tag Chips
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        for ((tag, _) in MessageTemplateEngine.AVAILABLE_TAGS) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(NothingCardRaised)
+                                    .border(1.dp, NothingBorder, RoundedCornerShape(6.dp))
+                                    .clickable { messageTemplate += " $tag" }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = tag,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = NothingWhite
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = messageTemplate,
+                        onValueChange = { messageTemplate = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingRed,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
+                    )
+
+                    // LIVE PREVIEW BOX
+                    Text(
+                        text = "LIVE WHATSAPP PREVIEW",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = NothingGray
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(NothingBlack, RoundedCornerShape(8.dp))
+                            .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = previewMessage,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            color = NothingWhite,
+                            lineHeight = 18.sp
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            onSaveTemplate(messageTemplate)
+                            showSavedMessage = true
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                        modifier = Modifier.align(Alignment.End),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("SAVE TEMPLATE", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.White)
+                    }
+                }
+            }
+
+            // 3. COMMISSION RATE
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, NothingBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = NothingCard),
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(text = "Commission Calculation", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(
-                        text = "Default commission rate (in rate per thousand, e.g. 3 = 0.3% / 3 per thousand):",
-                        fontSize = 13.sp,
-                        color = Color.DarkGray
+                        text = "COMMISSION RATE",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp,
+                        color = NothingGray
+                    )
+                    Text(
+                        text = "Rate per thousand (default: 3 = 0.3% / ₹3 per ₹1,000):",
+                        fontSize = 12.sp,
+                        color = NothingGray
                     )
 
                     OutlinedTextField(
                         value = commissionRateText,
                         onValueChange = { commissionRateText = it },
-                        label = { Text("Rate per thousand") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    Text(
-                        text = "ℹ Changing this rate only affects collections created afterwards. Past collection records keep their original snapshot rate.",
-                        fontSize = 12.sp,
-                        color = Color.Gray
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingRed,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
                     )
 
                     Button(
@@ -173,75 +331,93 @@ fun SettingsScreen(
                             onSaveRate(rate)
                             showSavedMessage = true
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
-                        modifier = Modifier.align(Alignment.End)
+                        colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                        modifier = Modifier.align(Alignment.End),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null)
+                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Save Rate")
+                        Text("SAVE RATE", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.White)
                     }
                 }
             }
 
-            // 3. ENCRYPTED BACKUP & RESTORE
+            // 4. ENCRYPTED BACKUP & RESTORE
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, NothingBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = NothingCard),
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Lock, contentDescription = null, tint = GreenPrimary)
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = NothingWhite)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Encrypted Local Backup (AES-256)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(
+                            text = "ENCRYPTED BACKUP (AES-256)",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            letterSpacing = 1.sp,
+                            color = NothingWhite
+                        )
                     }
 
                     Text(
                         text = "Last successful backup: ${settings.lastBackupAt?.let { dateFormat.format(Date(it)) } ?: "Never"}",
-                        fontSize = 13.sp,
-                        color = Color.DarkGray
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        color = NothingGray
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = onBackupNow,
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.buttonColors(containerColor = NothingWhite),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Back Up Now")
+                            Text("BACK UP NOW", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.Black)
                         }
 
                         OutlinedButton(
                             onClick = onRestoreBackupClick,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
-                            Icon(Icons.Default.Restore, contentDescription = null)
+                            Icon(Icons.Default.Restore, contentDescription = null, tint = NothingWhite)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Restore")
+                            Text("RESTORE", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
                         }
                     }
                 }
             }
 
-            // 4. PERSISTENT UNINSTALL WARNING CALLOUT
+            // 5. DATA RETENTION NOTICE
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = AmberWarningBg),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, NothingAmberBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = NothingAmberBg),
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = AmberWarning)
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = NothingAmber)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text(text = "Data Retention Notice", fontWeight = FontWeight.Bold, color = AmberWarning)
+                        Text(
+                            text = "DATA RETENTION NOTICE",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = NothingAmber
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Uninstalling this app permanently removes all local records unless an encrypted backup has been saved and exported.",
+                            text = "All data is stored exclusively offline on your device. Take regular encrypted backups before uninstalling or updating your phone.",
                             fontSize = 12.sp,
-                            color = Color.DarkGray,
+                            color = NothingGray,
                             lineHeight = 18.sp
                         )
                     }
@@ -253,11 +429,11 @@ fun SettingsScreen(
     if (showSavedMessage) {
         AlertDialog(
             onDismissRequest = { showSavedMessage = false },
-            title = { Text("Settings Saved") },
-            text = { Text("Your settings changes have been saved successfully.") },
+            title = { Text("SETTINGS SAVED", fontFamily = FontFamily.Monospace) },
+            text = { Text("Settings have been updated successfully.", color = NothingGray) },
             confirmButton = {
                 TextButton(onClick = { showSavedMessage = false }) {
-                    Text("OK")
+                    Text("OK", color = NothingRed)
                 }
             }
         )

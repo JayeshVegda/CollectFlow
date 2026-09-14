@@ -1,19 +1,23 @@
 package com.jayesh.cashcollect
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,30 +29,43 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
-import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.model.Customer
 import com.jayesh.cashcollect.service.whatsapp.WhatsAppLauncher
 import com.jayesh.cashcollect.ui.add.AddCollectionScreen
 import com.jayesh.cashcollect.ui.collections.CollectionsScreen
 import com.jayesh.cashcollect.ui.detail.CollectionDetailScreen
 import com.jayesh.cashcollect.ui.history.HistoryScreen
+import com.jayesh.cashcollect.ui.insights.InsightsScreen
 import com.jayesh.cashcollect.ui.settings.SettingsScreen
 import com.jayesh.cashcollect.ui.theme.CashCollectTheme
+import com.jayesh.cashcollect.ui.theme.NothingBlack
+import com.jayesh.cashcollect.ui.theme.NothingCard
+import com.jayesh.cashcollect.ui.theme.NothingGray
+import com.jayesh.cashcollect.ui.theme.NothingRed
+import com.jayesh.cashcollect.ui.theme.NothingWhite
+import com.jayesh.cashcollect.widget.CashCollectWidgetProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 sealed class Screen {
     object Collections : Screen()
+    object Insights : Screen()
     object History : Screen()
+    object Settings : Screen()
     object AddCollection : Screen()
     data class Detail(val collectionId: Long) : Screen()
-    object Settings : Screen()
 }
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 1. Official Google Edge-to-Edge API (Android 15 / SDK 35 standard)
+        enableEdgeToEdge()
+
         super.onCreate(savedInstanceState)
 
         val app = application as CashCollectApplication
@@ -60,12 +77,17 @@ class MainActivity : ComponentActivity() {
         val notificationManager = app.notificationManager
 
         val initialCollectionId = intent.getLongExtra("EXTRA_COLLECTION_ID", -1L)
+        val openAddDirectly = intent.getBooleanExtra("EXTRA_OPEN_ADD", false)
 
         setContent {
             CashCollectTheme {
                 var currentScreen by remember {
                     mutableStateOf<Screen>(
-                        if (initialCollectionId > 0) Screen.Detail(initialCollectionId) else Screen.Collections
+                        when {
+                            initialCollectionId > 0 -> Screen.Detail(initialCollectionId)
+                            openAddDirectly -> Screen.AddCollection
+                            else -> Screen.Collections
+                        }
                     )
                 }
 
@@ -85,51 +107,115 @@ class MainActivity : ComponentActivity() {
 
                 val scope = rememberCoroutineScope()
 
-                // Bottom Nav is shown only on root tabs (Collections, History)
-                val isRootTab = currentScreen is Screen.Collections || currentScreen is Screen.History
+                // Bottom Nav is shown on root tabs
+                val isRootTab = currentScreen is Screen.Collections ||
+                        currentScreen is Screen.Insights ||
+                        currentScreen is Screen.History ||
+                        currentScreen is Screen.Settings
 
                 Scaffold(
+                    containerColor = NothingBlack,
                     bottomBar = {
                         if (isRootTab) {
-                            NavigationBar {
+                            NavigationBar(
+                                containerColor = NothingCard
+                            ) {
                                 NavigationBarItem(
                                     selected = currentScreen is Screen.Collections,
                                     onClick = { currentScreen = Screen.Collections },
                                     icon = { Icon(Icons.Default.List, contentDescription = "Collections") },
-                                    label = { Text("Collections") }
+                                    label = { Text("COLLECT", fontFamily = FontFamily.Monospace, fontSize = 10.sp) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = NothingRed,
+                                        selectedTextColor = NothingRed,
+                                        indicatorColor = Color.Transparent,
+                                        unselectedIconColor = NothingGray,
+                                        unselectedTextColor = NothingGray
+                                    )
+                                )
+                                NavigationBarItem(
+                                    selected = currentScreen is Screen.Insights,
+                                    onClick = { currentScreen = Screen.Insights },
+                                    icon = { Icon(Icons.Default.Analytics, contentDescription = "Insights") },
+                                    label = { Text("INSIGHTS", fontFamily = FontFamily.Monospace, fontSize = 10.sp) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = NothingRed,
+                                        selectedTextColor = NothingRed,
+                                        indicatorColor = Color.Transparent,
+                                        unselectedIconColor = NothingGray,
+                                        unselectedTextColor = NothingGray
+                                    )
                                 )
                                 NavigationBarItem(
                                     selected = currentScreen is Screen.History,
                                     onClick = { currentScreen = Screen.History },
                                     icon = { Icon(Icons.Default.History, contentDescription = "History") },
-                                    label = { Text("History") }
+                                    label = { Text("HISTORY", fontFamily = FontFamily.Monospace, fontSize = 10.sp) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = NothingRed,
+                                        selectedTextColor = NothingRed,
+                                        indicatorColor = Color.Transparent,
+                                        unselectedIconColor = NothingGray,
+                                        unselectedTextColor = NothingGray
+                                    )
+                                )
+                                NavigationBarItem(
+                                    selected = currentScreen is Screen.Settings,
+                                    onClick = { currentScreen = Screen.Settings },
+                                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                                    label = { Text("SETTINGS", fontFamily = FontFamily.Monospace, fontSize = 10.sp) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = NothingRed,
+                                        selectedTextColor = NothingRed,
+                                        indicatorColor = Color.Transparent,
+                                        unselectedIconColor = NothingGray,
+                                        unselectedTextColor = NothingGray
+                                    )
                                 )
                             }
                         }
                     }
                 ) { innerPadding ->
                     Surface(
+                        color = NothingBlack,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding)
+                            .consumeWindowInsets(innerPadding)
                     ) {
                         when (val screen = currentScreen) {
                             is Screen.Collections -> {
                                 CollectionsScreen(
                                     outstandingList = outstandingList,
                                     pendingList = pendingList,
+                                    commissionRatePerThousand = appSettings.commissionRatePerThousand,
                                     onAddCollectionClick = { currentScreen = Screen.AddCollection },
+                                    onQuickCaptureSave = { name, amountPaise ->
+                                        scope.launch {
+                                            val customerId = customerRepo.addCustomer(name, null)
+                                            collectionRepo.createPendingCollection(
+                                                customerId = customerId,
+                                                amountPaise = amountPaise,
+                                                commissionRateSnapshot = appSettings.commissionRatePerThousand
+                                            )
+                                            CashCollectWidgetProvider.notifyDataChanged(this@MainActivity)
+                                            Toast.makeText(this@MainActivity, "Added pending: $name", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
                                     onCollectionClick = { id -> currentScreen = Screen.Detail(id) },
                                     onReceiveAndWhatsApp = { item ->
                                         scope.launch {
-                                            // 1. NON-NEGOTIABLE: Persist receipt to Room BEFORE intent
+                                            // 1. Commit receipt before WhatsApp intent
                                             val committed = collectionRepo.markReceivedAndCommit(item.id)
+                                            CashCollectWidgetProvider.notifyDataChanged(this@MainActivity)
 
-                                            // 2. Fire immediate local notification
+                                            // 2. Immediate notification
                                             notificationManager.showImmediateReceiptNotification(committed)
 
-                                            // 3. Launch WhatsApp intent
-                                            val msg = WhatsAppLauncher.buildReceiptMessage(committed)
+                                            // 3. Launch WhatsApp with customizable template
+                                            val msg = WhatsAppLauncher.buildReceiptMessage(
+                                                committed,
+                                                appSettings.messageTemplate
+                                            )
                                             val intent = WhatsAppLauncher.createSendIntent(
                                                 this@MainActivity,
                                                 appSettings.brotherWhatsAppNumber,
@@ -151,7 +237,10 @@ class MainActivity : ComponentActivity() {
                                     onOpenWhatsAppAgain = { item ->
                                         scope.launch {
                                             collectionRepo.logWhatsAppOpened(item.id)
-                                            val msg = WhatsAppLauncher.buildReceiptMessage(item)
+                                            val msg = WhatsAppLauncher.buildReceiptMessage(
+                                                item,
+                                                appSettings.messageTemplate
+                                            )
                                             val intent = WhatsAppLauncher.createSendIntent(
                                                 this@MainActivity,
                                                 appSettings.brotherWhatsAppNumber,
@@ -167,11 +256,16 @@ class MainActivity : ComponentActivity() {
                                     onConfirmSent = { id ->
                                         scope.launch {
                                             collectionRepo.confirmSent(id)
-                                            Toast.makeText(this@MainActivity, "Marked as Confirmed Sent", Toast.LENGTH_SHORT).show()
+                                            CashCollectWidgetProvider.notifyDataChanged(this@MainActivity)
+                                            Toast.makeText(this@MainActivity, "Confirmed Sent", Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     onSettingsClick = { currentScreen = Screen.Settings }
                                 )
+                            }
+
+                            is Screen.Insights -> {
+                                InsightsScreen(collections = historyList)
                             }
 
                             is Screen.AddCollection -> {
@@ -191,13 +285,15 @@ class MainActivity : ComponentActivity() {
                                             customerRepo.addCustomer(name, alias)
                                         }
                                     },
-                                    onSaveCollection = { customerId, amountPaise ->
+                                    onSaveCollection = { customerId, amountPaise, note ->
                                         scope.launch {
                                             collectionRepo.createPendingCollection(
                                                 customerId = customerId,
                                                 amountPaise = amountPaise,
-                                                commissionRateSnapshot = appSettings.commissionRatePerThousand
+                                                commissionRateSnapshot = appSettings.commissionRatePerThousand,
+                                                note = note
                                             )
+                                            CashCollectWidgetProvider.notifyDataChanged(this@MainActivity)
                                             currentScreen = Screen.Collections
                                         }
                                     },
@@ -215,8 +311,13 @@ class MainActivity : ComponentActivity() {
                                     onReceiveAndWhatsApp = { target ->
                                         scope.launch {
                                             val committed = collectionRepo.markReceivedAndCommit(target.id)
+                                            CashCollectWidgetProvider.notifyDataChanged(this@MainActivity)
                                             notificationManager.showImmediateReceiptNotification(committed)
-                                            val msg = WhatsAppLauncher.buildReceiptMessage(committed)
+
+                                            val msg = WhatsAppLauncher.buildReceiptMessage(
+                                                committed,
+                                                appSettings.messageTemplate
+                                            )
                                             val intent = WhatsAppLauncher.createSendIntent(
                                                 this@MainActivity,
                                                 appSettings.brotherWhatsAppNumber,
@@ -233,7 +334,10 @@ class MainActivity : ComponentActivity() {
                                     onOpenWhatsAppAgain = { target ->
                                         scope.launch {
                                             collectionRepo.logWhatsAppOpened(target.id)
-                                            val msg = WhatsAppLauncher.buildReceiptMessage(target)
+                                            val msg = WhatsAppLauncher.buildReceiptMessage(
+                                                target,
+                                                appSettings.messageTemplate
+                                            )
                                             val intent = WhatsAppLauncher.createSendIntent(
                                                 this@MainActivity,
                                                 appSettings.brotherWhatsAppNumber,
@@ -249,18 +353,21 @@ class MainActivity : ComponentActivity() {
                                     onConfirmSent = { id ->
                                         scope.launch {
                                             collectionRepo.confirmSent(id)
+                                            CashCollectWidgetProvider.notifyDataChanged(this@MainActivity)
                                             Toast.makeText(this@MainActivity, "Confirmed Sent", Toast.LENGTH_SHORT).show()
                                         }
                                     },
-                                    onVoidAndReplace = { originalId, reason, newAmountPaise ->
+                                    onVoidAndReplace = { originalId, reason, newAmountPaise, note ->
                                         scope.launch {
                                             val newId = collectionRepo.voidAndReplace(
                                                 originalId,
                                                 reason,
                                                 newAmountPaise,
-                                                appSettings.commissionRatePerThousand
+                                                appSettings.commissionRatePerThousand,
+                                                note
                                             )
-                                            Toast.makeText(this@MainActivity, "Voided and created replacement #$newId", Toast.LENGTH_SHORT).show()
+                                            CashCollectWidgetProvider.notifyDataChanged(this@MainActivity)
+                                            Toast.makeText(this@MainActivity, "Voided & replaced with #$newId", Toast.LENGTH_SHORT).show()
                                             currentScreen = Screen.Collections
                                         }
                                     },
@@ -301,6 +408,11 @@ class MainActivity : ComponentActivity() {
                                     onSaveNumber = { number ->
                                         scope.launch {
                                             settingsRepo.updateBrotherWhatsAppNumber(number)
+                                        }
+                                    },
+                                    onSaveTemplate = { template ->
+                                        scope.launch {
+                                            settingsRepo.updateMessageTemplate(template)
                                         }
                                     },
                                     onSaveRate = { rate ->

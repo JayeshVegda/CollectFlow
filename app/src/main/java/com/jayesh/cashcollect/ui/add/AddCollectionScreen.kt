@@ -3,6 +3,7 @@ package com.jayesh.cashcollect.ui.add
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,10 +45,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,9 +56,17 @@ import com.jayesh.cashcollect.domain.model.Customer
 import com.jayesh.cashcollect.domain.money.CommissionCalculator
 import com.jayesh.cashcollect.domain.money.Paise
 import com.jayesh.cashcollect.ui.common.AmountKeypad
-import com.jayesh.cashcollect.ui.theme.AmberWarning
-import com.jayesh.cashcollect.ui.theme.AmberWarningBg
-import com.jayesh.cashcollect.ui.theme.GreenPrimary
+import com.jayesh.cashcollect.ui.theme.NothingAmber
+import com.jayesh.cashcollect.ui.theme.NothingBlack
+import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingCard
+import com.jayesh.cashcollect.ui.theme.NothingCardRaised
+import com.jayesh.cashcollect.ui.theme.NothingGray
+import com.jayesh.cashcollect.ui.theme.NothingGreen
+import com.jayesh.cashcollect.ui.theme.NothingMuted
+import com.jayesh.cashcollect.ui.theme.NothingRed
+import com.jayesh.cashcollect.ui.theme.NothingWhite
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -66,13 +76,15 @@ fun AddCollectionScreen(
     commissionRatePerThousand: Int,
     onSearchCustomer: (String) -> Unit,
     onAddNewCustomer: (name: String, alias: String?) -> Unit,
-    onSaveCollection: (customerId: Long, amountPaise: Long) -> Unit,
+    onSaveCollection: (customerId: Long, amountPaise: Long, note: String?) -> Unit,
     onCheckDuplicate: suspend (customerId: Long, amountPaise: Long) -> Boolean,
     onBackClick: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCustomer by remember { mutableStateOf<Customer?>(null) }
     var amountDigits by remember { mutableStateOf("") } // Digits in rupees
+    var noteText by remember { mutableStateOf("") }
+
     var showNewCustomerDialog by remember { mutableStateOf(false) }
     var newCustomerName by remember { mutableStateOf("") }
     var newCustomerAlias by remember { mutableStateOf("") }
@@ -89,16 +101,22 @@ fun AddCollectionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add Cash Collection", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = "NEW COLLECTION",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = NothingWhite
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = NothingWhite)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = GreenPrimary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                    containerColor = NothingBlack
                 )
             )
         }
@@ -113,22 +131,26 @@ fun AddCollectionScreen(
         ) {
             // 1. CUSTOMER SELECTOR
             Text(
-                text = "1. Customer",
+                text = "1. PARTY / CUSTOMER",
+                fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = Color.DarkGray
+                fontSize = 12.sp,
+                letterSpacing = 1.sp,
+                color = NothingGray
             )
 
             if (selectedCustomer != null) {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
-                    shape = RoundedCornerShape(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, NothingRed, RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(containerColor = NothingCard),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .padding(14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -136,12 +158,18 @@ fun AddCollectionScreen(
                             Text(
                                 text = selectedCustomer!!.displayName,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                                fontSize = 17.sp,
+                                color = NothingWhite
                             )
-                            Text(text = "Selected Customer", fontSize = 12.sp, color = GreenPrimary)
+                            Text(
+                                text = "SELECTED PARTY",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                color = NothingRed
+                            )
                         }
                         TextButton(onClick = { selectedCustomer = null }) {
-                            Text("Change")
+                            Text("CHANGE", fontFamily = FontFamily.Monospace, color = NothingGray)
                         }
                     }
                 }
@@ -152,17 +180,23 @@ fun AddCollectionScreen(
                         searchQuery = it
                         onSearchCustomer(it)
                     },
-                    label = { Text("Search customer by name or area...") },
+                    placeholder = { Text("Search party by name or area...", color = NothingMuted) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = NothingRed,
+                        unfocusedBorderColor = NothingBorder,
+                        focusedTextColor = NothingWhite,
+                        unfocusedTextColor = NothingWhite
+                    )
                 )
 
                 if (searchQuery.isNotEmpty()) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White, RoundedCornerShape(8.dp))
-                            .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
+                            .background(NothingCard, RoundedCornerShape(12.dp))
+                            .border(1.dp, NothingBorder, RoundedCornerShape(12.dp))
                             .padding(8.dp)
                     ) {
                         for (customer in searchResults.take(5)) {
@@ -173,11 +207,11 @@ fun AddCollectionScreen(
                                         selectedCustomer = customer
                                         searchQuery = ""
                                     }
-                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                    .padding(vertical = 10.dp, horizontal = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(customer.displayName, fontWeight = FontWeight.Medium)
-                                Text("Select", color = GreenPrimary, fontSize = 13.sp)
+                                Text(customer.displayName, fontWeight = FontWeight.Medium, color = NothingWhite)
+                                Text("SELECT", fontFamily = FontFamily.Monospace, color = NothingRed, fontSize = 12.sp)
                             }
                         }
 
@@ -189,34 +223,42 @@ fun AddCollectionScreen(
                                     newCustomerName = searchQuery
                                     showNewCustomerDialog = true
                                 }
-                                .padding(top = 8.dp, bottom = 4.dp, start = 4.dp),
+                                .padding(top = 8.dp, bottom = 4.dp, start = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.PersonAdd, contentDescription = null, tint = GreenPrimary)
+                            Icon(Icons.Default.PersonAdd, contentDescription = null, tint = NothingRed)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Add \"$searchQuery\" as new customer",
-                                color = GreenPrimary,
+                                text = "Add \"$searchQuery\" as new party",
+                                color = NothingRed,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 } else if (recentCustomers.isNotEmpty()) {
-                    Text(text = "Recent Customers:", fontSize = 12.sp, color = Color.Gray)
+                    Text(
+                        text = "RECENT PARTIES",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = NothingGray
+                    )
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         for (customer in recentCustomers.take(6)) {
                             Card(
-                                modifier = Modifier.clickable { selectedCustomer = customer },
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F1F1)),
-                                shape = RoundedCornerShape(16.dp)
+                                modifier = Modifier
+                                    .border(1.dp, NothingBorder, RoundedCornerShape(14.dp))
+                                    .clickable { selectedCustomer = customer },
+                                colors = CardDefaults.cardColors(containerColor = NothingCardRaised),
+                                shape = RoundedCornerShape(14.dp)
                             ) {
                                 Text(
                                     text = customer.displayName,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium,
+                                    color = NothingWhite,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                 )
                             }
@@ -227,52 +269,113 @@ fun AddCollectionScreen(
 
             // 2. AMOUNT & COMMISSION DISPLAY
             Text(
-                text = "2. Amount & Commission",
+                text = "2. AMOUNT & COMMISSION",
+                fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = Color.DarkGray
+                fontSize = 12.sp,
+                letterSpacing = 1.sp,
+                color = NothingGray
             )
 
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, NothingBorder, RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = NothingCard),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Collection Amount", fontSize = 12.sp, color = Color.Gray)
+                Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = if (amountRupees > 0) Paise.fromRupees(amountRupees).toFormattedRupees() else "₹0",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (amountRupees > 0) GreenPrimary else Color.LightGray
+                        text = "CASH AMOUNT",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        color = NothingGray
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (amountRupees > 0) Paise.fromRupees(amountRupees).toFormattedRupees() else "₹0",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (amountRupees > 0) NothingWhite else NothingMuted
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Live Commission (${commissionRatePerThousand}/1000):",
+                            text = "Commission (${commissionRatePerThousand}/1000):",
                             fontSize = 13.sp,
-                            color = Color.Gray
+                            color = NothingGray
                         )
                         Text(
                             text = Paise(computedCommissionPaise).toFormattedRupees(),
+                            fontFamily = FontFamily.Monospace,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.DarkGray
+                            color = NothingGreen
                         )
                     }
                 }
             }
 
-            // 3. NUMERIC KEYPAD
+            // Quick Shorthand Preset Chips (1-tap amounts!)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val presets = listOf(
+                    "50k" to 50000L,
+                    "1L" to 100000L,
+                    "2L" to 200000L,
+                    "4L" to 400000L,
+                    "5L" to 500000L,
+                    "10L" to 1000000L
+                )
+                for ((label, valRupees) in presets) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(NothingCardRaised)
+                            .border(1.dp, NothingBorder, RoundedCornerShape(8.dp))
+                            .clickable { amountDigits = valRupees.toString() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = label,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = NothingWhite
+                        )
+                    }
+                }
+            }
+
+            // 3. OPTIONAL NOTE FIELD
+            OutlinedTextField(
+                value = noteText,
+                onValueChange = { noteText = it },
+                placeholder = { Text("Optional note (e.g. 500 bundles, counter slip)...", color = NothingMuted) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = NothingRed,
+                    unfocusedBorderColor = NothingBorder,
+                    focusedTextColor = NothingWhite,
+                    unfocusedTextColor = NothingWhite
+                )
+            )
+
+            // 4. NUMERIC KEYPAD
             AmountKeypad(
                 onDigitClick = { digit ->
-                    if (amountDigits.length < 9) { // Max ₹99,99,99,999
+                    if (amountDigits.length < 9) {
                         amountDigits += digit
                     }
                 },
@@ -286,17 +389,16 @@ fun AddCollectionScreen(
                 }
             )
 
-            // 4. SAVE ACTION
+            // 5. SAVE ACTION BUTTON
             Button(
                 onClick = {
                     val customer = selectedCustomer ?: return@Button
                     if (amountPaise <= 0L) return@Button
 
                     val doSave = {
-                        onSaveCollection(customer.id, amountPaise)
+                        onSaveCollection(customer.id, amountPaise, noteText)
                     }
 
-                    // Soft duplicate warning check
                     coroutineScope.launch {
                         val isDup = onCheckDuplicate(customer.id, amountPaise)
                         if (isDup) {
@@ -311,10 +413,17 @@ fun AddCollectionScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
-                shape = RoundedCornerShape(8.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Save Pending Collection", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "SAVE PENDING COLLECTION",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                    color = Color.White
+                )
             }
         }
     }
@@ -323,20 +432,32 @@ fun AddCollectionScreen(
     if (showNewCustomerDialog) {
         AlertDialog(
             onDismissRequest = { showNewCustomerDialog = false },
-            title = { Text("Add Customer") },
+            title = { Text("NEW PARTY", fontFamily = FontFamily.Monospace) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = newCustomerName,
                         onValueChange = { newCustomerName = it },
-                        label = { Text("Customer Name *") },
-                        singleLine = true
+                        label = { Text("Party Name *") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingRed,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
                     )
                     OutlinedTextField(
                         value = newCustomerAlias,
                         onValueChange = { newCustomerAlias = it },
-                        label = { Text("Area / Shop Alias (Optional)") },
-                        singleLine = true
+                        label = { Text("Area / Shop Alias") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingRed,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
                     )
                 }
             },
@@ -348,14 +469,14 @@ fun AddCollectionScreen(
                             showNewCustomerDialog = false
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = NothingRed)
                 ) {
-                    Text("Save Customer")
+                    Text("SAVE", fontFamily = FontFamily.Monospace)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showNewCustomerDialog = false }) {
-                    Text("Cancel")
+                    Text("CANCEL", color = NothingGray)
                 }
             }
         )
@@ -365,10 +486,13 @@ fun AddCollectionScreen(
     if (showDuplicateWarningDialog) {
         AlertDialog(
             onDismissRequest = { showDuplicateWarningDialog = false },
-            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = AmberWarning) },
-            title = { Text("Possible Duplicate Collection") },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = NothingAmber) },
+            title = { Text("DUPLICATE WARNING", fontFamily = FontFamily.Monospace) },
             text = {
-                Text("A collection for ${selectedCustomer?.displayName} of ${Paise(amountPaise).toFormattedRupees()} was already recorded within the last 30 minutes.\n\nDo you want to record it again?")
+                Text(
+                    "A collection for ${selectedCustomer?.displayName} of ${Paise(amountPaise).toFormattedRupees()} was already recorded within the last 30 minutes.\n\nSave anyway?",
+                    color = NothingGray
+                )
             },
             confirmButton = {
                 Button(
@@ -376,14 +500,14 @@ fun AddCollectionScreen(
                         showDuplicateWarningDialog = false
                         pendingSaveAction?.invoke()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = AmberWarning)
+                    colors = ButtonDefaults.buttonColors(containerColor = NothingAmber)
                 ) {
-                    Text("Yes, Save Anyway")
+                    Text("SAVE ANYWAY", fontFamily = FontFamily.Monospace)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDuplicateWarningDialog = false }) {
-                    Text("Cancel")
+                    Text("CANCEL", color = NothingGray)
                 }
             }
         )

@@ -68,7 +68,8 @@ class CollectionRepository(
         customerId: Long,
         amountPaise: Long,
         commissionRateSnapshot: Int,
-        replacesId: Long? = null
+        replacesId: Long? = null,
+        note: String? = null
     ): Long {
         require(amountPaise > 0L) { "Amount in paise must be positive: $amountPaise" }
         require(commissionRateSnapshot >= 0) { "Commission rate cannot be negative" }
@@ -84,7 +85,8 @@ class CollectionRepository(
                 commissionPaise = commissionPaise,
                 status = CollectionStatus.PENDING.name,
                 createdAt = now,
-                replacesId = replacesId
+                replacesId = replacesId,
+                note = note?.trim()?.takeIf { it.isNotEmpty() }
             )
             val newId = collectionDao.insert(entity)
             customerDao.updateLastUsed(customerId, now)
@@ -150,7 +152,8 @@ class CollectionRepository(
         originalId: Long,
         voidReason: String,
         newAmountPaise: Long,
-        commissionRateSnapshot: Int
+        commissionRateSnapshot: Int,
+        note: String? = null
     ): Long {
         val validatedReason = CollectionStateMachine.validateVoidReason(voidReason)
 
@@ -172,7 +175,8 @@ class CollectionRepository(
                 commissionPaise = newCommissionPaise,
                 status = CollectionStatus.PENDING.name,
                 createdAt = now,
-                replacesId = originalId
+                replacesId = originalId,
+                note = note?.trim()?.takeIf { it.isNotEmpty() } ?: original.note
             )
             val newId = collectionDao.insert(replacementEntity)
 

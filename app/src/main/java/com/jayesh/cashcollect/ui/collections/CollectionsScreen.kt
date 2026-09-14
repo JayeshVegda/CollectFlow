@@ -1,5 +1,6 @@
 package com.jayesh.cashcollect.ui.collections
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,9 +18,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -30,8 +34,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -46,16 +51,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jayesh.cashcollect.domain.model.CollectionItem
+import com.jayesh.cashcollect.domain.money.CommissionCalculator
 import com.jayesh.cashcollect.domain.money.Paise
+import com.jayesh.cashcollect.domain.money.SmartInputParser
 import com.jayesh.cashcollect.ui.common.ConfirmBottomSheet
-import com.jayesh.cashcollect.ui.theme.AmberWarning
-import com.jayesh.cashcollect.ui.theme.AmberWarningBg
-import com.jayesh.cashcollect.ui.theme.AmberWarningBorder
-import com.jayesh.cashcollect.ui.theme.GreenPrimary
+import com.jayesh.cashcollect.ui.theme.NothingAmber
+import com.jayesh.cashcollect.ui.theme.NothingAmberBg
+import com.jayesh.cashcollect.ui.theme.NothingAmberBorder
+import com.jayesh.cashcollect.ui.theme.NothingBlack
+import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingCard
+import com.jayesh.cashcollect.ui.theme.NothingCardRaised
+import com.jayesh.cashcollect.ui.theme.NothingGray
+import com.jayesh.cashcollect.ui.theme.NothingGreen
+import com.jayesh.cashcollect.ui.theme.NothingMuted
+import com.jayesh.cashcollect.ui.theme.NothingRed
+import com.jayesh.cashcollect.ui.theme.NothingWhite
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -66,13 +83,18 @@ import java.util.Locale
 fun CollectionsScreen(
     outstandingList: List<CollectionItem>,
     pendingList: List<CollectionItem>,
+    commissionRatePerThousand: Int,
     onAddCollectionClick: () -> Unit,
+    onQuickCaptureSave: (customerName: String, amountPaise: Long) -> Unit,
     onCollectionClick: (Long) -> Unit,
     onReceiveAndWhatsApp: (CollectionItem) -> Unit,
     onOpenWhatsAppAgain: (CollectionItem) -> Unit,
     onConfirmSent: (Long) -> Unit,
     onSettingsClick: () -> Unit
 ) {
+    var quickInputText by remember { mutableStateOf("") }
+    val parsedResult = remember(quickInputText) { SmartInputParser.parse(quickInputText) }
+
     var selectedItemForConfirm by remember { mutableStateOf<CollectionItem?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -80,24 +102,32 @@ fun CollectionsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Cash Collect", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = "COLLECTFLOW",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp,
+                        fontSize = 18.sp,
+                        color = NothingWhite
+                    )
+                },
                 actions = {
                     IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = NothingGray)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = GreenPrimary,
-                    titleContentColor = Color.White,
-                    actionIconContentColor = Color.White
+                    containerColor = NothingBlack
                 )
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddCollectionClick,
-                containerColor = GreenPrimary,
-                contentColor = Color.White
+                containerColor = NothingRed,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Collection")
             }
@@ -108,17 +138,134 @@ fun CollectionsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. OUTSTANDING CONFIRMATIONS (Warning Amber)
+            // 1. SMART QUICK-CAPTURE BAR
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, if (parsedResult != null) NothingRed else NothingBorder, RoundedCornerShape(16.dp)),
+                    colors = CardDefaults.cardColors(containerColor = NothingCard),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.FlashOn,
+                                contentDescription = null,
+                                tint = if (parsedResult != null) NothingRed else NothingGray,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                text = "SMART QUICK CAPTURE",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NothingGray,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = quickInputText,
+                            onValueChange = { quickInputText = it },
+                            placeholder = {
+                                Text(
+                                    "e.g. \"sambhu 400\" or \"mahesh 1.5L\"",
+                                    fontSize = 13.sp,
+                                    color = NothingMuted
+                                )
+                            },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedTextColor = NothingWhite,
+                                unfocusedTextColor = NothingWhite
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                parsedResult?.let { res ->
+                                    if (res.customerName.isNotBlank() && res.amountPaise > 0L) {
+                                        onQuickCaptureSave(res.customerName, res.amountPaise)
+                                        quickInputText = ""
+                                    }
+                                }
+                            }),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(NothingBlack, RoundedCornerShape(10.dp))
+                                .padding(horizontal = 4.dp)
+                        )
+
+                        // Live Parsed Tokens Preview
+                        AnimatedVisibility(visible = parsedResult != null) {
+                            parsedResult?.let { res ->
+                                val commission = CommissionCalculator.calculate(res.amountPaise, commissionRatePerThousand)
+                                Column(modifier = Modifier.padding(top = 10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = if (res.customerName.isNotBlank()) res.customerName else "Enter party name...",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp,
+                                                color = NothingWhite
+                                            )
+                                            Text(
+                                                text = "${res.formattedRupees} • Comm: ${Paise(commission).toFormattedRupees()}",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 12.sp,
+                                                color = NothingGreen
+                                            )
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                if (res.customerName.isNotBlank() && res.amountPaise > 0L) {
+                                                    onQuickCaptureSave(res.customerName, res.amountPaise)
+                                                    quickInputText = ""
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = "ADD",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. OUTSTANDING CONFIRMATIONS (Warning Amber)
             if (outstandingList.isNotEmpty()) {
                 item {
                     Text(
                         text = "OUTSTANDING CONFIRMATIONS (${outstandingList.size})",
+                        fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = AmberWarning
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp,
+                        color = NothingAmber
                     )
                 }
 
@@ -132,20 +279,16 @@ fun CollectionsScreen(
                 }
             }
 
-            // 2. PENDING COLLECTIONS
+            // 3. PENDING COLLECTIONS
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "PENDING COLLECTIONS (${pendingList.size})",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = Color.DarkGray
-                    )
-                }
+                Text(
+                    text = "PENDING COLLECTIONS (${pendingList.size})",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    letterSpacing = 1.sp,
+                    color = NothingGray
+                )
             }
 
             if (pendingList.isEmpty() && outstandingList.isEmpty()) {
@@ -157,9 +300,11 @@ fun CollectionsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No pending collections.\nTap + to add a collection.",
-                            color = Color.Gray,
-                            lineHeight = 22.sp
+                            text = "No pending collections.\nUse Quick Capture above or tap + to add.",
+                            fontFamily = FontFamily.Monospace,
+                            color = NothingMuted,
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp
                         )
                     }
                 }
@@ -206,10 +351,10 @@ private fun OutstandingRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.5.dp, AmberWarningBorder, RoundedCornerShape(12.dp))
+            .border(1.dp, NothingAmberBorder, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = AmberWarningBg),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = NothingAmberBg),
+        shape = RoundedCornerShape(14.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -218,13 +363,20 @@ private fun OutstandingRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "⚠️ CASH ALREADY RECEIVED",
+                    text = "⚠️ CASH RECEIVED (UNSENT)",
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
-                    color = AmberWarning
+                    letterSpacing = 0.5.sp,
+                    color = NothingAmber
                 )
                 val timeAgo = formatTimeAgo(item.receivedAt ?: item.createdAt)
-                Text(text = timeAgo, fontSize = 12.sp, color = Color.Gray)
+                Text(
+                    text = timeAgo,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = NothingGray
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -238,19 +390,22 @@ private fun OutstandingRow(
                     Text(
                         text = item.customerDisplayName,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
+                        fontSize = 17.sp,
+                        color = NothingWhite
                     )
                     Text(
-                        text = "Commission: ${Paise(item.commissionPaise).toFormattedRupees()}",
-                        fontSize = 13.sp,
-                        color = Color.DarkGray
+                        text = "Comm: ${Paise(item.commissionPaise).toFormattedRupees()}",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        color = NothingGray
                     )
                 }
                 Text(
                     text = Paise(item.amountPaise).toFormattedRupees(),
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp,
-                    color = AmberWarning
+                    color = NothingAmber
                 )
             }
 
@@ -265,20 +420,20 @@ private fun OutstandingRow(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = NothingWhite)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Reopen WA", fontSize = 13.sp)
+                    Text("REOPEN WA", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
                 }
 
                 Button(
                     onClick = onConfirmSent,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = NothingGreen),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null)
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Yes, Sent", fontSize = 13.sp)
+                    Text("YES, SENT", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
                 }
             }
         }
@@ -294,10 +449,10 @@ private fun PendingRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .border(1.dp, NothingBorder, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = NothingCard),
+        shape = RoundedCornerShape(14.dp)
     ) {
         Row(
             modifier = Modifier
@@ -310,28 +465,38 @@ private fun PendingRow(
                 Text(
                     text = item.customerDisplayName,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    fontSize = 16.sp,
+                    color = NothingWhite
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = Paise(item.amountPaise).toFormattedRupees(),
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = GreenPrimary
+                    color = NothingWhite
                 )
                 Text(
-                    text = "Commission: ${Paise(item.commissionPaise).toFormattedRupees()}",
+                    text = "Comm: ${Paise(item.commissionPaise).toFormattedRupees()}",
+                    fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = NothingGray
                 )
             }
 
             Button(
                 onClick = onReceiveClick,
-                colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Receive & WA", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text(
+                    text = "RECEIVE",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    letterSpacing = 0.5.sp,
+                    color = Color.White
+                )
             }
         }
     }

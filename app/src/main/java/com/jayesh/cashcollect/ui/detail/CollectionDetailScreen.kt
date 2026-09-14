@@ -1,6 +1,6 @@
 package com.jayesh.cashcollect.ui.detail
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,10 +54,17 @@ import com.jayesh.cashcollect.domain.money.Paise
 import com.jayesh.cashcollect.domain.state.CollectionStatus
 import com.jayesh.cashcollect.ui.common.ConfirmBottomSheet
 import com.jayesh.cashcollect.ui.common.StatusBadge
-import com.jayesh.cashcollect.ui.theme.AmberWarning
-import com.jayesh.cashcollect.ui.theme.AmberWarningBg
-import com.jayesh.cashcollect.ui.theme.ErrorRed
-import com.jayesh.cashcollect.ui.theme.GreenPrimary
+import com.jayesh.cashcollect.ui.theme.NothingAmber
+import com.jayesh.cashcollect.ui.theme.NothingAmberBg
+import com.jayesh.cashcollect.ui.theme.NothingAmberBorder
+import com.jayesh.cashcollect.ui.theme.NothingBlack
+import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingCard
+import com.jayesh.cashcollect.ui.theme.NothingCardRaised
+import com.jayesh.cashcollect.ui.theme.NothingGray
+import com.jayesh.cashcollect.ui.theme.NothingGreen
+import com.jayesh.cashcollect.ui.theme.NothingRed
+import com.jayesh.cashcollect.ui.theme.NothingWhite
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -68,12 +77,12 @@ fun CollectionDetailScreen(
     onReceiveAndWhatsApp: (CollectionItem) -> Unit,
     onOpenWhatsAppAgain: (CollectionItem) -> Unit,
     onConfirmSent: (Long) -> Unit,
-    onVoidAndReplace: (originalId: Long, reason: String, newAmountPaise: Long) -> Unit,
+    onVoidAndReplace: (originalId: Long, reason: String, newAmountPaise: Long, note: String?) -> Unit,
     onBackClick: () -> Unit
 ) {
     if (collection == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Collection not found")
+            Text("Collection not found", color = NothingGray)
         }
         return
     }
@@ -82,6 +91,7 @@ fun CollectionDetailScreen(
     var showVoidDialog by remember { mutableStateOf(false) }
     var voidReason by remember { mutableStateOf("") }
     var newAmountRupees by remember { mutableStateOf("") }
+    var newNote by remember { mutableStateOf(collection.note ?: "") }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -90,17 +100,21 @@ fun CollectionDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Collection #${collection.id}") },
+                title = {
+                    Text(
+                        text = "COLLECTION #${collection.id}",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = NothingWhite
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = NothingWhite)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = GreenPrimary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = NothingBlack)
             )
         }
     ) { paddingValues ->
@@ -109,31 +123,35 @@ fun CollectionDetailScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // STATUS BADGE
             StatusBadge(status = collection.status)
 
-            // 1. CUSTOMER NAME (Large)
+            // Customer Name
             Text(
                 text = collection.customerDisplayName,
                 fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = NothingWhite
             )
 
-            // 2. AMOUNT (Largest on screen)
+            // Amount
             Text(
                 text = Paise(collection.amountPaise).toFormattedRupees(),
+                fontFamily = FontFamily.Monospace,
                 fontSize = 38.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = GreenPrimary
+                fontWeight = FontWeight.Bold,
+                color = NothingWhite
             )
 
-            // 3. COMMISSION TO PAY
+            // Commission Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F9F9))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, NothingBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = NothingCard),
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -143,56 +161,82 @@ fun CollectionDetailScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(text = "Commission to Pay", color = Color.Gray, fontSize = 13.sp)
+                        Text(
+                            text = "COMMISSION TO PAY",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = NothingGray
+                        )
                         Text(
                             text = "Rate snapshotted: ${collection.commissionRateSnapshot}/1000",
-                            fontSize = 11.sp,
-                            color = Color.DarkGray
+                            fontSize = 12.sp,
+                            color = NothingGray
                         )
                     }
                     Text(
                         text = Paise(collection.commissionPaise).toFormattedRupees(),
+                        fontFamily = FontFamily.Monospace,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = NothingGreen
                     )
                 }
             }
 
-            // TIMELINE / AUDIT INFO
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(text = "Audit Log", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-
-                    DetailRow(label = "Created:", value = dateFormat.format(Date(collection.createdAt)))
-
-                    collection.receivedAt?.let {
-                        DetailRow(label = "Cash Received:", value = dateFormat.format(Date(it)))
-                    }
-
-                    collection.whatsappOpenedAt?.let {
-                        DetailRow(label = "WhatsApp Opened:", value = dateFormat.format(Date(it)))
-                    }
-
-                    collection.confirmedSentAt?.let {
-                        DetailRow(label = "Confirmed Sent:", value = dateFormat.format(Date(it)))
-                    }
-
-                    if (collection.status == CollectionStatus.VOIDED) {
-                        DetailRow(label = "Void Reason:", value = collection.voidReason.orEmpty(), isError = true)
-                        collection.replacesId?.let { DetailRow(label = "Replaced Old Item:", value = "#$it") }
-                        collection.replacedById?.let { DetailRow(label = "Replaced By New Item:", value = "#$it") }
+            // Note card if present
+            if (!collection.note.isNullOrBlank()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, NothingBorder, RoundedCornerShape(14.dp)),
+                    colors = CardDefaults.cardColors(containerColor = NothingCard),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "NOTE",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            color = NothingGray
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(text = collection.note, color = NothingWhite, fontSize = 14.sp)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // Timeline / Audit
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, NothingBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = NothingCard),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "AUDIT TRAIL",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp,
+                        color = NothingGray
+                    )
 
-            // 4. STATUS-DEPENDENT PRIMARY ACTION
+                    DetailRow(label = "Created", value = dateFormat.format(Date(collection.createdAt)))
+                    collection.receivedAt?.let { DetailRow(label = "Cash Received", value = dateFormat.format(Date(it))) }
+                    collection.whatsappOpenedAt?.let { DetailRow(label = "WhatsApp Opened", value = dateFormat.format(Date(it))) }
+                    collection.confirmedSentAt?.let { DetailRow(label = "Confirmed Sent", value = dateFormat.format(Date(it))) }
+
+                    if (collection.status == CollectionStatus.VOIDED) {
+                        DetailRow(label = "Void Reason", value = collection.voidReason.orEmpty(), isError = true)
+                        collection.replacesId?.let { DetailRow(label = "Replaced Old Item", value = "#$it") }
+                        collection.replacedById?.let { DetailRow(label = "Replaced By New Item", value = "#$it") }
+                    }
+                }
+            }
+
+            // Contextual Status Actions
             when (collection.status) {
                 CollectionStatus.PENDING -> {
                     Button(
@@ -200,28 +244,39 @@ fun CollectionDetailScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
-                        shape = RoundedCornerShape(8.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Receive & WhatsApp", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "RECEIVE & OPEN WHATSAPP",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Color.White
+                        )
                     }
                 }
 
                 CollectionStatus.RECEIPT_CONFIRMED -> {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = AmberWarningBg)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, NothingAmberBorder, RoundedCornerShape(14.dp)),
+                        colors = CardDefaults.cardColors(containerColor = NothingAmberBg),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "⚠️ Confirmation Outstanding",
+                                text = "⚠️ CONFIRMATION OUTSTANDING",
+                                fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                color = AmberWarning
+                                color = NothingAmber,
+                                fontSize = 12.sp
                             )
                             Text(
-                                text = "Cash is already recorded on your phone. Did you tap Send in WhatsApp?",
+                                text = "Did you tap Send in WhatsApp?",
                                 fontSize = 13.sp,
-                                color = Color.DarkGray
+                                color = NothingGray
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -229,21 +284,23 @@ fun CollectionDetailScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(
                                     onClick = { onOpenWhatsAppAgain(collection) },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null)
+                                    Icon(Icons.Default.Refresh, contentDescription = null, tint = NothingWhite)
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Open WA Again", fontSize = 12.sp)
+                                    Text("OPEN WA AGAIN", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
                                 }
 
                                 Button(
                                     onClick = { onConfirmSent(collection.id) },
                                     modifier = Modifier.weight(1f),
-                                    colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                                    colors = ButtonDefaults.buttonColors(containerColor = NothingGreen),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Icon(Icons.Default.Check, contentDescription = null)
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Yes, Sent", fontSize = 12.sp)
+                                    Text("YES, SENT", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
                                 }
                             }
                         }
@@ -252,24 +309,24 @@ fun CollectionDetailScreen(
 
                 CollectionStatus.CONFIRMED -> {
                     Text(
-                        text = "✓ This collection has been completely confirmed and archived.",
-                        color = GreenPrimary,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
+                        text = "✓ This collection is confirmed and archived.",
+                        fontFamily = FontFamily.Monospace,
+                        color = NothingGreen,
+                        fontSize = 13.sp
                     )
                 }
 
                 CollectionStatus.VOIDED -> {
                     Text(
-                        text = "✕ This collection is voided and cannot be modified.",
-                        color = ErrorRed,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
+                        text = "✕ This collection is voided.",
+                        fontFamily = FontFamily.Monospace,
+                        color = NothingRed,
+                        fontSize = 13.sp
                     )
                 }
             }
 
-            // 5. "CORRECT THIS ENTRY" ACTION (Void & Replace flow)
+            // Void / Correct Button
             if (collection.status != CollectionStatus.VOIDED) {
                 OutlinedButton(
                     onClick = {
@@ -278,25 +335,22 @@ fun CollectionDetailScreen(
                         showVoidDialog = true
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = null)
+                    Icon(Icons.Default.Edit, contentDescription = null, tint = NothingGray)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Correct This Entry (Void & Replace)")
+                    Text("CORRECT ENTRY (VOID & REPLACE)", fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = NothingGray)
                 }
             }
         }
     }
 
-    // Confirm Bottom Sheet
     if (showConfirmSheet) {
         ConfirmBottomSheet(
             collection = collection,
             sheetState = sheetState,
             onDismiss = {
-                scope.launch { sheetState.hide() }.invokeOnCompletion {
-                    showConfirmSheet = false
-                }
+                scope.launch { sheetState.hide() }.invokeOnCompletion { showConfirmSheet = false }
             },
             onConfirmReceiveAndWhatsApp = {
                 scope.launch { sheetState.hide() }.invokeOnCompletion {
@@ -307,50 +361,72 @@ fun CollectionDetailScreen(
         )
     }
 
-    // Dialog: Void & Replace
     if (showVoidDialog) {
         AlertDialog(
             onDismissRequest = { showVoidDialog = false },
-            title = { Text("Correct Entry #${collection.id}") },
+            title = { Text("CORRECT ENTRY #${collection.id}", fontFamily = FontFamily.Monospace) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Original record will be preserved in history as VOIDED. A linked replacement record will be created.",
+                        text = "Original will be voided. A linked replacement will be created.",
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = NothingGray
                     )
                     OutlinedTextField(
                         value = voidReason,
                         onValueChange = { voidReason = it },
                         label = { Text("Reason for Correction *") },
-                        placeholder = { Text("e.g. Wrong amount entered") },
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingRed,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
                     )
                     OutlinedTextField(
                         value = newAmountRupees,
                         onValueChange = { newAmountRupees = it },
                         label = { Text("Correct Amount (₹) *") },
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingRed,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
+                    )
+                    OutlinedTextField(
+                        value = newNote,
+                        onValueChange = { newNote = it },
+                        label = { Text("Note (Optional)") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingRed,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
                     )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val newAmount = newAmountRupees.toLongOrNull() ?: 0L
-                        if (voidReason.isNotBlank() && newAmount > 0L) {
+                        val newAmt = newAmountRupees.toLongOrNull() ?: 0L
+                        if (voidReason.isNotBlank() && newAmt > 0L) {
                             showVoidDialog = false
-                            onVoidAndReplace(collection.id, voidReason, newAmount * 100L)
+                            onVoidAndReplace(collection.id, voidReason, newAmt * 100L, newNote)
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = NothingRed)
                 ) {
-                    Text("Void & Replace")
+                    Text("VOID & REPLACE", fontFamily = FontFamily.Monospace)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showVoidDialog = false }) {
-                    Text("Cancel")
+                    Text("CANCEL", color = NothingGray)
                 }
             }
         )
@@ -363,12 +439,13 @@ private fun DetailRow(label: String, value: String, isError: Boolean = false) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, color = Color.Gray, fontSize = 13.sp)
+        Text(text = label, color = NothingGray, fontSize = 13.sp)
         Text(
             text = value,
+            fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
-            color = if (isError) ErrorRed else Color.Black
+            color = if (isError) NothingRed else NothingWhite
         )
     }
 }

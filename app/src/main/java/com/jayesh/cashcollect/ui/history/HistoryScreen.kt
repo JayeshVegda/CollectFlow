@@ -1,5 +1,6 @@
 package com.jayesh.cashcollect.ui.history
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -23,9 +24,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -38,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -46,7 +50,14 @@ import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
 import com.jayesh.cashcollect.domain.state.CollectionStatus
 import com.jayesh.cashcollect.ui.common.StatusBadge
-import com.jayesh.cashcollect.ui.theme.GreenPrimary
+import com.jayesh.cashcollect.ui.theme.NothingBlack
+import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingCard
+import com.jayesh.cashcollect.ui.theme.NothingCardRaised
+import com.jayesh.cashcollect.ui.theme.NothingGray
+import com.jayesh.cashcollect.ui.theme.NothingMuted
+import com.jayesh.cashcollect.ui.theme.NothingRed
+import com.jayesh.cashcollect.ui.theme.NothingWhite
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,17 +83,21 @@ fun HistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("History & Records", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = "TRANSACTION HISTORY",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = NothingWhite
+                    )
+                },
                 actions = {
                     IconButton(onClick = onExportCsvClick) {
-                        Icon(Icons.Default.FileDownload, contentDescription = "Export CSV")
+                        Icon(Icons.Default.FileDownload, contentDescription = "Export CSV", tint = NothingWhite)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = GreenPrimary,
-                    titleContentColor = Color.White,
-                    actionIconContentColor = Color.White
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = NothingBlack)
             )
         }
     ) { paddingValues ->
@@ -92,19 +107,25 @@ fun HistoryScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = { Text("Search by customer name or alias...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                placeholder = { Text("Search party or area...", color = NothingMuted) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = NothingGray) },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = NothingRed,
+                    unfocusedBorderColor = NothingBorder,
+                    focusedTextColor = NothingWhite,
+                    unfocusedTextColor = NothingWhite
+                )
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Filter Chips
             Row(
@@ -116,7 +137,11 @@ fun HistoryScreen(
                 FilterChip(
                     selected = selectedStatus == null,
                     onClick = { selectedStatus = null },
-                    label = { Text("All") }
+                    label = { Text("ALL", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = NothingRed,
+                        selectedLabelColor = Color.White
+                    )
                 )
                 for (status in CollectionStatus.values()) {
                     FilterChip(
@@ -124,7 +149,11 @@ fun HistoryScreen(
                         onClick = {
                             selectedStatus = if (selectedStatus == status) null else status
                         },
-                        label = { Text(status.name) }
+                        label = { Text(status.name, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = NothingRed,
+                            selectedLabelColor = Color.White
+                        )
                     )
                 }
             }
@@ -138,7 +167,7 @@ fun HistoryScreen(
                         .padding(top = 48.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No records match your filters.", color = Color.Gray)
+                    Text("No records match your filters.", fontFamily = FontFamily.Monospace, color = NothingMuted)
                 }
             } else {
                 LazyColumn(
@@ -163,12 +192,10 @@ private fun HistoryRow(item: CollectionItem, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .border(1.dp, NothingBorder, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isVoided) Color(0xFFFBFBFB) else Color.White
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        shape = RoundedCornerShape(10.dp)
+        colors = CardDefaults.cardColors(containerColor = NothingCard),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -180,6 +207,7 @@ private fun HistoryRow(item: CollectionItem, onClick: () -> Unit) {
                     text = item.customerDisplayName,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
+                    color = NothingWhite,
                     textDecoration = if (isVoided) TextDecoration.LineThrough else null
                 )
                 StatusBadge(status = item.status)
@@ -194,24 +222,36 @@ private fun HistoryRow(item: CollectionItem, onClick: () -> Unit) {
             ) {
                 Text(
                     text = dateFormat.format(Date(item.createdAt)),
-                    fontSize = 12.sp,
-                    color = Color.Gray
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = NothingGray
                 )
                 Text(
                     text = Paise(item.amountPaise).toFormattedRupees(),
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = if (isVoided) Color.Gray else GreenPrimary,
+                    color = if (isVoided) NothingGray else NothingWhite,
                     textDecoration = if (isVoided) TextDecoration.LineThrough else null
+                )
+            }
+
+            if (!item.note.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Note: ${item.note}",
+                    fontSize = 12.sp,
+                    color = NothingGray
                 )
             }
 
             if (isVoided && !item.voidReason.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Reason: ${item.voidReason}",
-                    fontSize = 12.sp,
-                    color = Color(0xFFB00020)
+                    text = "Void Reason: ${item.voidReason}",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = NothingRed
                 )
             }
         }

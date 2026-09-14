@@ -19,7 +19,8 @@ data class CollectionItem(
     val voidedAt: Long? = null,
     val voidReason: String? = null,
     val replacedById: Long? = null,
-    val replacesId: Long? = null
+    val replacesId: Long? = null,
+    val note: String? = null
 ) {
     val amount: Paise get() = Paise(amountPaise)
     val commission: Paise get() = Paise(commissionPaise)

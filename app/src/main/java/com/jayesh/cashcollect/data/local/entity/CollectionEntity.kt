@@ -51,5 +51,7 @@ data class CollectionEntity(
     @ColumnInfo(name = "replaced_by_id")
     val replacedById: Long? = null,
     @ColumnInfo(name = "replaces_id")
-    val replacesId: Long? = null
+    val replacesId: Long? = null,
+    @ColumnInfo(name = "note")
+    val note: String? = null
 )

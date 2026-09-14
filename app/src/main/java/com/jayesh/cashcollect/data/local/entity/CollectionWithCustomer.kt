@@ -27,7 +27,8 @@ data class CollectionWithCustomer(
             voidedAt = collection.voidedAt,
             voidReason = collection.voidReason,
             replacedById = collection.replacedById,
-            replacesId = collection.replacesId
+            replacesId = collection.replacesId,
+            note = collection.note
         )
     }
 }

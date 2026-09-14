@@ -17,21 +17,13 @@ object WhatsAppLauncher {
     const val PACKAGE_WHATSAPP_BUSINESS = "com.whatsapp.w4b"
 
     /**
-     * Builds the pre-filled receipt message strictly from the stored collection record.
+     * Builds the pre-filled receipt message using the user's custom template or default.
      */
-    fun buildReceiptMessage(collection: CollectionItem): String {
-        val amountFormatted = Paise(collection.amountPaise).toFormattedRupees()
-        val timeFormatted = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(
-            Date(collection.receivedAt ?: collection.createdAt)
+    fun buildReceiptMessage(collection: CollectionItem, customTemplate: String = ""): String {
+        return com.jayesh.cashcollect.domain.template.MessageTemplateEngine.formatMessage(
+            customTemplate,
+            collection
         )
-
-        return buildString {
-            appendLine("💰 *Cash Received*")
-            appendLine("Customer: *${collection.customerDisplayName}*")
-            appendLine("Amount: *$amountFormatted*")
-            appendLine("Time: $timeFormatted")
-            appendLine("Ref: #${collection.id}")
-        }
     }
 
     /**
