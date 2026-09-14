@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -70,9 +71,30 @@ import com.jayesh.cashcollect.ui.theme.NothingGray
 import com.jayesh.cashcollect.ui.theme.NothingMuted
 import com.jayesh.cashcollect.ui.theme.NothingRed
 import com.jayesh.cashcollect.ui.theme.NothingWhite
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+@Composable
+fun SettingsRoute(
+    viewModel: SettingsViewModel,
+    onBackupNow: () -> Unit,
+    onRestoreBackupClick: () -> Unit,
+    onBackClick: () -> Unit
+) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+
+    SettingsScreen(
+        settings = settings,
+        onSaveNumber = viewModel::saveBrotherNumber,
+        onSaveTemplate = viewModel::saveMessageTemplate,
+        onSaveRate = viewModel::saveCommissionRate,
+        onBackupNow = onBackupNow,
+        onRestoreBackupClick = onRestoreBackupClick,
+        onBackClick = onBackClick
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -103,6 +125,8 @@ fun SettingsScreen(
     val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
 
     Scaffold(
+        containerColor = NothingBlack,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
@@ -129,7 +153,6 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -165,7 +188,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NothingRed,
+                            focusedBorderColor = NothingWhite,
                             unfocusedBorderColor = NothingBorder,
                             focusedTextColor = NothingWhite,
                             unfocusedTextColor = NothingWhite
@@ -177,13 +200,16 @@ fun SettingsScreen(
                             onSaveNumber(brotherNumber)
                             showSavedMessage = true
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = NothingWhite,
+                            contentColor = Color.Black
+                        ),
                         modifier = Modifier.align(Alignment.End),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(999.dp)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("SAVE NUMBER", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.White)
+                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("SAVE NUMBER", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
                     }
                 }
             }
@@ -243,7 +269,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NothingRed,
+                            focusedBorderColor = NothingWhite,
                             unfocusedBorderColor = NothingBorder,
                             focusedTextColor = NothingWhite,
                             unfocusedTextColor = NothingWhite
@@ -281,13 +307,16 @@ fun SettingsScreen(
                             onSaveTemplate(messageTemplate)
                             showSavedMessage = true
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = NothingWhite,
+                            contentColor = Color.Black
+                        ),
                         modifier = Modifier.align(Alignment.End),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(999.dp)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("SAVE TEMPLATE", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.White)
+                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("SAVE TEMPLATE", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
                     }
                 }
             }
@@ -322,7 +351,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NothingRed,
+                            focusedBorderColor = NothingWhite,
                             unfocusedBorderColor = NothingBorder,
                             focusedTextColor = NothingWhite,
                             unfocusedTextColor = NothingWhite
@@ -335,13 +364,16 @@ fun SettingsScreen(
                             onSaveRate(rate)
                             showSavedMessage = true
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = NothingWhite,
+                            contentColor = Color.Black
+                        ),
                         modifier = Modifier.align(Alignment.End),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(999.dp)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("SAVE RATE", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Color.White)
+                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("SAVE RATE", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
                     }
                 }
             }

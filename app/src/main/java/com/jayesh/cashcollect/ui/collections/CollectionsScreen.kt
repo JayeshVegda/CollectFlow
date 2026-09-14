@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Refresh
@@ -74,6 +77,36 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@Composable
+fun CollectRoute(
+    viewModel: CollectViewModel,
+    initialOpenQuickCapture: Boolean,
+    onQuickCaptureDismissed: () -> Unit,
+    onAddCollectionClick: () -> Unit,
+    onCollectionClick: (Long) -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val outstandingList by viewModel.outstandingList.collectAsStateWithLifecycle()
+    val pendingList by viewModel.pendingList.collectAsStateWithLifecycle()
+    val commissionRate by viewModel.commissionRate.collectAsStateWithLifecycle()
+
+    CollectionsScreen(
+        outstandingList = outstandingList,
+        pendingList = pendingList,
+        commissionRatePerThousand = commissionRate,
+        initialOpenQuickCapture = initialOpenQuickCapture,
+        onQuickCaptureDismissed = onQuickCaptureDismissed,
+        onAddCollectionClick = onAddCollectionClick,
+        onQuickCaptureSave = { name, amt, note -> viewModel.saveQuickCapture(context, name, amt, note) },
+        onCollectionClick = onCollectionClick,
+        onReceiveAndWhatsApp = { item -> viewModel.confirmReceiveAndOpenWhatsApp(context, item) },
+        onOpenWhatsAppAgain = { item -> viewModel.openWhatsAppAgain(context, item) },
+        onConfirmSent = { id -> viewModel.confirmSent(context, id) },
+        onSettingsClick = onSettingsClick
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollectionsScreen(
@@ -115,6 +148,7 @@ fun CollectionsScreen(
 
     Scaffold(
         containerColor = NothingBlack,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {

@@ -44,11 +44,11 @@ jobs:
             exit 1
           }
 
-      - name: Assemble Debug APK
+      - name: Assemble Debug & Release APKs
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --stacktrace 2>&1 | tee assemble_log.txt || {
-            echo "## ❌ Assemble Debug APK Failed" >> $GITHUB_STEP_SUMMARY
+          ./gradlew assembleDebug assembleRelease --stacktrace 2>&1 | tee assemble_log.txt || {
+            echo "## ❌ Assemble APKs Failed" >> $GITHUB_STEP_SUMMARY
             echo '```text' >> $GITHUB_STEP_SUMMARY
             tail -n 120 assemble_log.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
@@ -67,14 +67,22 @@ jobs:
             test_log.txt
             assemble_log.txt
 
-      - name: Prepare APK for Release
-        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/CollectFlow-debug.apk
+      - name: Prepare APKs for Release
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk CollectFlow-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk CollectFlow-release.apk
+          echo "### 📦 APK Sizes" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Type | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Debug (unminified) | $(du -h CollectFlow-debug.apk | cut -f1) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release (R8 minified) | $(du -h CollectFlow-release.apk | cut -f1) |" >> $GITHUB_STEP_SUMMARY
+          ls -lh CollectFlow-*.apk
 
-      - name: Upload Debug APK Artifact
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: CollectFlow-debug-apk
-          path: app/build/outputs/apk/debug/CollectFlow-debug.apk
+          name: CollectFlow-APKs
+          path: CollectFlow-*.apk
           retention-days: 30
 
       - name: Publish to GitHub Releases (Direct One-Click Download)
@@ -85,7 +93,10 @@ jobs:
           name: "CollectFlow v1.0.0"
           body: |
             ### 📱 Download for Android Phone
-            Tap the **`CollectFlow-debug.apk`** file below to download and install directly on your phone (no unzipping needed!).
-          files: app/build/outputs/apk/debug/CollectFlow-debug.apk
+            - **`CollectFlow-release.apk`**: R8-minified, optimized release build.
+            - **`CollectFlow-debug.apk`**: Debug build.
+          files: |
+            CollectFlow-release.apk
+            CollectFlow-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

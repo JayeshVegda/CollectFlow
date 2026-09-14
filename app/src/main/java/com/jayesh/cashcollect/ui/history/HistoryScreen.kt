@@ -9,16 +9,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -64,30 +66,46 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@Composable
+fun HistoryRoute(
+    viewModel: HistoryViewModel,
+    onItemClick: (Long) -> Unit
+) {
+    val context = LocalContext.current
+    val items by viewModel.filteredItems.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val selectedStatus by viewModel.selectedStatus.collectAsStateWithLifecycle()
+
+    HistoryScreen(
+        items = items,
+        searchQuery = searchQuery,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        selectedStatus = selectedStatus,
+        onStatusSelect = viewModel::onStatusSelect,
+        onItemClick = onItemClick,
+        onExportCsvClick = { viewModel.exportCsv(context) }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     items: List<CollectionItem>,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
+    selectedStatus: CollectionStatus? = null,
+    onStatusSelect: (CollectionStatus?) -> Unit = {},
     onItemClick: (Long) -> Unit,
     onExportCsvClick: () -> Unit
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedStatus by remember { mutableStateOf<CollectionStatus?>(null) }
-
-    val filteredItems = items.filter { item ->
-        val matchesSearch = searchQuery.isBlank() ||
-                item.customerName.contains(searchQuery, ignoreCase = true) ||
-                (item.customerAlias?.contains(searchQuery, ignoreCase = true) == true)
-        val matchesStatus = selectedStatus == null || item.status == selectedStatus
-        matchesSearch && matchesStatus
-    }
-
     Scaffold(
+        containerColor = NothingBlack,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "TRANSACTION HISTORY",
+                        text = "HISTORY",
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp,
@@ -107,7 +125,6 @@ fun HistoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .imePadding()
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -115,7 +132,7 @@ fun HistoryScreen(
             // Search Bar
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = onSearchQueryChange,
                 placeholder = { Text("Search party or area...", color = NothingMuted) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = NothingGray) },
                 modifier = Modifier.fillMaxWidth(),
@@ -139,7 +156,7 @@ fun HistoryScreen(
             ) {
                 FilterChip(
                     selected = selectedStatus == null,
-                    onClick = { selectedStatus = null },
+                    onClick = { onStatusSelect(null) },
                     label = { Text("ALL", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
                     colors = FilterChipDefaults.filterChipColors(
                         containerColor = NothingCard,
@@ -159,7 +176,7 @@ fun HistoryScreen(
                     FilterChip(
                         selected = selectedStatus == status,
                         onClick = {
-                            selectedStatus = if (selectedStatus == status) null else status
+                            onStatusSelect(if (selectedStatus == status) null else status)
                         },
                         label = { Text(status.name, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
@@ -180,7 +197,7 @@ fun HistoryScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (filteredItems.isEmpty()) {
+            if (items.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -195,7 +212,7 @@ fun HistoryScreen(
                     contentPadding = PaddingValues(top = 8.dp, bottom = 72.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(filteredItems, key = { it.id }) { item ->
+                    items(items, key = { it.id }) { item ->
                         HistoryRow(item = item, onClick = { onItemClick(item.id) })
                     }
                 }
