@@ -41,7 +41,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -77,6 +79,7 @@ fun AddCollectionScreen(
 
     var showDuplicateWarningDialog by remember { mutableStateOf(false) }
     var pendingSaveAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     // Parse amount in rupees -> paise
     val amountRupees = amountDigits.toLongOrNull() ?: 0L
@@ -294,7 +297,7 @@ fun AddCollectionScreen(
                     }
 
                     // Soft duplicate warning check
-                    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                    coroutineScope.launch {
                         val isDup = onCheckDuplicate(customer.id, amountPaise)
                         if (isDup) {
                             pendingSaveAction = doSave
