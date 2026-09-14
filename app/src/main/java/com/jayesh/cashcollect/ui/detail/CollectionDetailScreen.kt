@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,6 +61,7 @@ import com.jayesh.cashcollect.ui.theme.NothingAmberBg
 import com.jayesh.cashcollect.ui.theme.NothingAmberBorder
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingCardRaised
 import com.jayesh.cashcollect.ui.theme.NothingGray
