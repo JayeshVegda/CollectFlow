@@ -17,7 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-class CashCollectWidgetProvider : AppWidgetProvider() {
+class CashCollectTrackerWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         updateWidgets(context, appWidgetManager, appWidgetIds)
@@ -26,12 +26,11 @@ class CashCollectWidgetProvider : AppWidgetProvider() {
     companion object {
         fun notifyDataChanged(context: Context) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
-            val thisWidget = ComponentName(context, CashCollectWidgetProvider::class.java)
+            val thisWidget = ComponentName(context, CashCollectTrackerWidgetProvider::class.java)
             val appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
             if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
                 updateWidgets(context, appWidgetManager, appWidgetIds)
             }
-            CashCollectTrackerWidgetProvider.notifyDataChanged(context)
         }
 
         private fun updateWidgets(
@@ -43,7 +42,7 @@ class CashCollectWidgetProvider : AppWidgetProvider() {
                 val db = AppDatabase.getInstance(context)
                 val allCollections = db.collectionDao().getAllSync()
 
-                // Calculate today's total
+                // Today 00:00:00
                 val cal = Calendar.getInstance().apply {
                     set(Calendar.HOUR_OF_DAY, 0)
                     set(Calendar.MINUTE, 0)
@@ -53,19 +52,25 @@ class CashCollectWidgetProvider : AppWidgetProvider() {
                 val startOfToday = cal.timeInMillis
 
                 val validItems = allCollections.filter { it.status != CollectionStatus.VOIDED.name }
-                val todayTotalPaise = validItems.filter {
+                val todayItems = validItems.filter {
                     val t = it.receivedAt ?: it.createdAt
                     t >= startOfToday
-                }.sumOf { it.amountPaise }
+                }
+
+                val todayTotalPaise = todayItems.sumOf { it.amountPaise }
+                val todayCommPaise = todayItems.sumOf { it.commissionPaise }
+                val count = todayItems.size
 
                 val unconfirmedCount = validItems.count {
                     it.status == CollectionStatus.RECEIPT_CONFIRMED.name
                 }
 
                 val amountFormatted = Paise(todayTotalPaise).toFormattedRupees()
+                val commFormatted = "COMM: " + Paise(todayCommPaise).toFormattedRupees()
+                val countFormatted = if (count == 1) "1 ENTRY" else "$count ENTRIES"
 
                 val unconfirmedText = if (unconfirmedCount > 0) {
-                    "⚠️ $unconfirmedCount UNSENT"
+                    "⚠️ $unconfirmedCount UNSENT RECEIPTS"
                 } else {
                     "✓ ALL CONFIRMED"
                 }
@@ -76,10 +81,12 @@ class CashCollectWidgetProvider : AppWidgetProvider() {
                 }
 
                 for (appWidgetId in appWidgetIds) {
-                    val views = RemoteViews(context.packageName, R.layout.widget_cash_collect).apply {
-                        setTextViewText(R.id.widget_today_amount, amountFormatted)
-                        setTextViewText(R.id.widget_unconfirmed_status, unconfirmedText)
-                        setTextColor(R.id.widget_unconfirmed_status, unconfirmedColor)
+                    val views = RemoteViews(context.packageName, R.layout.widget_cash_collect_wide).apply {
+                        setTextViewText(R.id.widget_wide_today_amount, amountFormatted)
+                        setTextViewText(R.id.widget_wide_commission, commFormatted)
+                        setTextViewText(R.id.widget_wide_count, countFormatted)
+                        setTextViewText(R.id.widget_wide_status, unconfirmedText)
+                        setTextColor(R.id.widget_wide_status, unconfirmedColor)
 
                         // Tap whole container opens app
                         val openAppIntent = Intent(context, MainActivity::class.java).apply {
@@ -87,11 +94,23 @@ class CashCollectWidgetProvider : AppWidgetProvider() {
                         }
                         val openAppPendingIntent = PendingIntent.getActivity(
                             context,
-                            0,
+                            20,
                             openAppIntent,
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                         )
-                        setOnClickPendingIntent(R.id.widget_container, openAppPendingIntent)
+                        setOnClickPendingIntent(R.id.widget_wide_container, openAppPendingIntent)
+
+                        // Open button
+                        val openFeedIntent = Intent(context, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        }
+                        val openFeedPendingIntent = PendingIntent.getActivity(
+                            context,
+                            21,
+                            openFeedIntent,
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        )
+                        setOnClickPendingIntent(R.id.widget_wide_btn_open, openFeedPendingIntent)
 
                         // Tap + Quick opens Quick Capture modal directly
                         val openQuickIntent = Intent(context, MainActivity::class.java).apply {
@@ -100,11 +119,11 @@ class CashCollectWidgetProvider : AppWidgetProvider() {
                         }
                         val openQuickPendingIntent = PendingIntent.getActivity(
                             context,
-                            1,
+                            22,
                             openQuickIntent,
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                         )
-                        setOnClickPendingIntent(R.id.widget_btn_add, openQuickPendingIntent)
+                        setOnClickPendingIntent(R.id.widget_wide_btn_quick, openQuickPendingIntent)
                     }
 
                     appWidgetManager.updateAppWidget(appWidgetId, views)

@@ -122,6 +122,7 @@ fun CollectionDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -243,16 +244,20 @@ fun CollectionDetailScreen(
                         onClick = { showConfirmSheet = true },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
-                        shape = RoundedCornerShape(12.dp)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = NothingWhite,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(999.dp)
                     ) {
                         Text(
                             text = "RECEIVE & OPEN WHATSAPP",
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = Color.White
+                            fontSize = 12.sp,
+                            letterSpacing = 0.5.sp,
+                            color = Color.Black
                         )
                     }
                 }
@@ -284,21 +289,22 @@ fun CollectionDetailScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(
                                     onClick = { onOpenWhatsAppAgain(collection) },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp)
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    shape = RoundedCornerShape(999.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, NothingBorderVisible)
                                 ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, tint = NothingWhite)
+                                    Icon(Icons.Default.Refresh, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("OPEN WA AGAIN", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
                                 }
 
                                 Button(
                                     onClick = { onConfirmSent(collection.id) },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f).height(40.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = NothingGreen),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(999.dp)
                                 ) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("YES, SENT", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
                                 }
@@ -334,14 +340,17 @@ fun CollectionDetailScreen(
                         voidReason = ""
                         showVoidDialog = true
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape = RoundedCornerShape(999.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NothingBorderVisible)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, tint = NothingGray)
+                    Icon(Icons.Default.Edit, contentDescription = null, tint = NothingGray, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("CORRECT ENTRY (VOID & REPLACE)", fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = NothingGray)
+                    Text("CORRECT ENTRY (VOID & REPLACE)", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingGray)
                 }
             }
+
+            Spacer(modifier = Modifier.height(72.dp))
         }
     }
 

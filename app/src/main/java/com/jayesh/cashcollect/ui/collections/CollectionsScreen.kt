@@ -1,6 +1,5 @@
 package com.jayesh.cashcollect.ui.collections
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,14 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Refresh
@@ -31,18 +28,17 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,22 +46,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jayesh.cashcollect.domain.model.CollectionItem
-import com.jayesh.cashcollect.domain.money.CommissionCalculator
 import com.jayesh.cashcollect.domain.money.Paise
-import com.jayesh.cashcollect.domain.money.SmartInputParser
 import com.jayesh.cashcollect.ui.common.ConfirmBottomSheet
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingAmberBg
 import com.jayesh.cashcollect.ui.theme.NothingAmberBorder
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingCardRaised
 import com.jayesh.cashcollect.ui.theme.NothingGray
@@ -84,35 +79,70 @@ fun CollectionsScreen(
     outstandingList: List<CollectionItem>,
     pendingList: List<CollectionItem>,
     commissionRatePerThousand: Int,
+    initialOpenQuickCapture: Boolean = false,
     onAddCollectionClick: () -> Unit,
-    onQuickCaptureSave: (customerName: String, amountPaise: Long) -> Unit,
+    onQuickCaptureSave: (customerName: String, amountPaise: Long, note: String?) -> Unit,
     onCollectionClick: (Long) -> Unit,
     onReceiveAndWhatsApp: (CollectionItem) -> Unit,
     onOpenWhatsAppAgain: (CollectionItem) -> Unit,
     onConfirmSent: (Long) -> Unit,
     onSettingsClick: () -> Unit
 ) {
-    var quickInputText by remember { mutableStateOf("") }
-    val parsedResult = remember(quickInputText) { SmartInputParser.parse(quickInputText) }
+    var isQuickCaptureOpen by remember { mutableStateOf(initialOpenQuickCapture) }
+    val quickCaptureSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    LaunchedEffect(initialOpenQuickCapture) {
+        if (initialOpenQuickCapture) {
+            isQuickCaptureOpen = true
+        }
+    }
 
     var selectedItemForConfirm by remember { mutableStateOf<CollectionItem?>(null) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val confirmSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
     Scaffold(
+        containerColor = NothingBlack,
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "COLLECTFLOW",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp,
-                        fontSize = 18.sp,
-                        color = NothingWhite
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(NothingRed)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "COLLECTFLOW",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp,
+                            fontSize = 17.sp,
+                            color = NothingWhite
+                        )
+                    }
                 },
                 actions = {
+                    // Quick Action pill in top bar
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .border(1.dp, NothingBorderVisible, RoundedCornerShape(999.dp))
+                            .clickable { isQuickCaptureOpen = true }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "+ QUICK",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            color = NothingWhite
+                        )
+                    }
+
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings", tint = NothingGray)
                     }
@@ -123,13 +153,27 @@ fun CollectionsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddCollectionClick,
-                containerColor = NothingRed,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp)
+            ExtendedFloatingActionButton(
+                onClick = { isQuickCaptureOpen = true },
+                containerColor = NothingWhite,
+                contentColor = Color.Black,
+                shape = RoundedCornerShape(999.dp),
+                modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(999.dp))
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Collection")
+                Icon(
+                    Icons.Default.FlashOn,
+                    contentDescription = null,
+                    tint = NothingRed,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "QUICK CAPTURE",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    letterSpacing = 0.8.sp
+                )
             }
         }
     ) { paddingValues ->
@@ -138,119 +182,65 @@ fun CollectionsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. SMART QUICK-CAPTURE BAR
+            // 1. Sleek Quick Action Bar Trigger
             item {
-                Card(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, if (parsedResult != null) NothingRed else NothingBorder, RoundedCornerShape(16.dp)),
-                    colors = CardDefaults.cardColors(containerColor = NothingCard),
-                    shape = RoundedCornerShape(16.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .border(1.dp, NothingBorderVisible, RoundedCornerShape(14.dp))
+                        .background(NothingCard)
+                        .clickable { isQuickCaptureOpen = true }
+                        .padding(16.dp)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                Icons.Default.FlashOn,
-                                contentDescription = null,
-                                tint = if (parsedResult != null) NothingRed else NothingGray,
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(NothingRed)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "SMART QUICK CAPTURE",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp,
+                                    color = NothingWhite
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
-                                text = "SMART QUICK CAPTURE",
+                                text = "e.g. \"sambhu 400\" or \"mahesh 1.5L\"",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingGray,
-                                letterSpacing = 1.sp
+                                color = NothingGray
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = quickInputText,
-                            onValueChange = { quickInputText = it },
-                            placeholder = {
-                                Text(
-                                    "e.g. \"sambhu 400\" or \"mahesh 1.5L\"",
-                                    fontSize = 13.sp,
-                                    color = NothingMuted
-                                )
-                            },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedTextColor = NothingWhite,
-                                unfocusedTextColor = NothingWhite
-                            ),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = {
-                                parsedResult?.let { res ->
-                                    if (res.customerName.isNotBlank() && res.amountPaise > 0L) {
-                                        onQuickCaptureSave(res.customerName, res.amountPaise)
-                                        quickInputText = ""
-                                    }
-                                }
-                            }),
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .background(NothingBlack, RoundedCornerShape(10.dp))
-                                .padding(horizontal = 4.dp)
-                        )
-
-                        // Live Parsed Tokens Preview
-                        AnimatedVisibility(visible = parsedResult != null) {
-                            parsedResult?.let { res ->
-                                val commission = CommissionCalculator.calculate(res.amountPaise, commissionRatePerThousand)
-                                Column(modifier = Modifier.padding(top = 10.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column {
-                                            Text(
-                                                text = if (res.customerName.isNotBlank()) res.customerName else "Enter party name...",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp,
-                                                color = NothingWhite
-                                            )
-                                            Text(
-                                                text = "${res.formattedRupees} • Comm: ${Paise(commission).toFormattedRupees()}",
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 12.sp,
-                                                color = NothingGreen
-                                            )
-                                        }
-
-                                        Button(
-                                            onClick = {
-                                                if (res.customerName.isNotBlank() && res.amountPaise > 0L) {
-                                                    onQuickCaptureSave(res.customerName, res.amountPaise)
-                                                    quickInputText = ""
-                                                }
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
-                                            shape = RoundedCornerShape(8.dp),
-                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = "ADD",
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(NothingWhite)
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "POPUP",
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = Color.Black
+                            )
                         }
                     }
                 }
@@ -263,7 +253,7 @@ fun CollectionsScreen(
                         text = "OUTSTANDING CONFIRMATIONS (${outstandingList.size})",
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         letterSpacing = 1.sp,
                         color = NothingAmber
                     )
@@ -285,7 +275,7 @@ fun CollectionsScreen(
                     text = "PENDING COLLECTIONS (${pendingList.size})",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     letterSpacing = 1.sp,
                     color = NothingGray
                 )
@@ -296,11 +286,11 @@ fun CollectionsScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 40.dp),
+                            .padding(vertical = 48.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No pending collections.\nUse Quick Capture above or tap + to add.",
+                            text = "No pending collections.\nTap \"+ QUICK CAPTURE\" to add.",
                             fontFamily = FontFamily.Monospace,
                             color = NothingMuted,
                             fontSize = 13.sp,
@@ -320,18 +310,35 @@ fun CollectionsScreen(
         }
     }
 
+    // Quick Capture Popup BottomSheet
+    if (isQuickCaptureOpen) {
+        QuickCaptureBottomSheet(
+            sheetState = quickCaptureSheetState,
+            commissionRatePerThousand = commissionRatePerThousand,
+            onDismiss = { isQuickCaptureOpen = false },
+            onConfirmSave = { name, amountPaise, note ->
+                isQuickCaptureOpen = false
+                onQuickCaptureSave(name, amountPaise, note)
+            },
+            onOpenFullForm = {
+                isQuickCaptureOpen = false
+                onAddCollectionClick()
+            }
+        )
+    }
+
     // Confirmation Bottom Sheet before committing & launching WhatsApp
     selectedItemForConfirm?.let { item ->
         ConfirmBottomSheet(
             collection = item,
-            sheetState = sheetState,
+            sheetState = confirmSheetState,
             onDismiss = {
-                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                scope.launch { confirmSheetState.hide() }.invokeOnCompletion {
                     selectedItemForConfirm = null
                 }
             },
             onConfirmReceiveAndWhatsApp = {
-                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                scope.launch { confirmSheetState.hide() }.invokeOnCompletion {
                     val target = selectedItemForConfirm
                     selectedItemForConfirm = null
                     target?.let { onReceiveAndWhatsApp(it) }
@@ -399,6 +406,14 @@ private fun OutstandingRow(
                         fontSize = 12.sp,
                         color = NothingGray
                     )
+                    if (!item.note.isNullOrBlank()) {
+                        Text(
+                            text = "Note: ${item.note}",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = NothingMuted
+                        )
+                    }
                 }
                 Text(
                     text = Paise(item.amountPaise).toFormattedRupees(),
@@ -417,21 +432,22 @@ private fun OutstandingRow(
             ) {
                 OutlinedButton(
                     onClick = onOpenWhatsAppAgain,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp)
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    shape = RoundedCornerShape(999.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NothingBorderVisible)
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = NothingWhite)
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("REOPEN WA", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
                 }
 
                 Button(
                     onClick = onConfirmSent,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).height(40.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = NothingGreen),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(999.dp)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("YES, SENT", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
                 }
@@ -449,7 +465,7 @@ private fun PendingRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, NothingBorder, RoundedCornerShape(14.dp))
+            .border(1.dp, NothingBorderVisible, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = NothingCard),
         shape = RoundedCornerShape(14.dp)
@@ -482,20 +498,32 @@ private fun PendingRow(
                     fontSize = 12.sp,
                     color = NothingGray
                 )
+                if (!item.note.isNullOrBlank()) {
+                    Text(
+                        text = "Note: ${item.note}",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = NothingMuted
+                    )
+                }
             }
 
             Button(
                 onClick = onReceiveClick,
-                colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
-                shape = RoundedCornerShape(8.dp)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NothingWhite,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(999.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = "RECEIVE",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     letterSpacing = 0.5.sp,
-                    color = Color.White
+                    color = Color.Black
                 )
             }
         }

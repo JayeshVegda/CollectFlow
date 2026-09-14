@@ -40,6 +40,7 @@ import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingCardRaised
 import com.jayesh.cashcollect.ui.theme.NothingGray
@@ -79,7 +80,7 @@ fun InsightsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 72.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 1. TODAY'S HERO METRIC CARD

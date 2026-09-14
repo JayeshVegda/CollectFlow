@@ -48,18 +48,19 @@
         android:id="@+id/widget_btn_add"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_nothing_btn"
-        android:paddingHorizontal="14dp"
-        android:paddingVertical="10dp"
+        android:background="@drawable/bg_nothing_btn_pill_white"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="9dp"
         android:gravity="center">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="+ ADD"
-            android:textColor="#FFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            android:text="+ QUICK"
+            android:textColor="#000000"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
     </LinearLayout>
 
 </LinearLayout>

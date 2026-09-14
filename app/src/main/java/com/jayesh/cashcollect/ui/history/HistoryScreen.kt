@@ -52,6 +52,7 @@ import com.jayesh.cashcollect.domain.state.CollectionStatus
 import com.jayesh.cashcollect.ui.common.StatusBadge
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingCardRaised
 import com.jayesh.cashcollect.ui.theme.NothingGray
@@ -105,6 +106,7 @@ fun HistoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .imePadding()
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -118,8 +120,8 @@ fun HistoryScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = NothingRed,
-                    unfocusedBorderColor = NothingBorder,
+                    focusedBorderColor = NothingWhite,
+                    unfocusedBorderColor = NothingBorderVisible,
                     focusedTextColor = NothingWhite,
                     unfocusedTextColor = NothingWhite
                 )
@@ -132,18 +134,19 @@ fun HistoryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 FilterChip(
                     selected = selectedStatus == null,
                     onClick = { selectedStatus = null },
                     label = { Text("ALL", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = NothingRed,
-                        selectedLabelColor = Color.White
+                        selectedContainerColor = NothingWhite,
+                        selectedLabelColor = Color.Black
                     )
                 )
-                for (status in CollectionStatus.values()) {
+
+                CollectionStatus.values().forEach { status ->
                     FilterChip(
                         selected = selectedStatus == status,
                         onClick = {
@@ -151,8 +154,8 @@ fun HistoryScreen(
                         },
                         label = { Text(status.name, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = NothingRed,
-                            selectedLabelColor = Color.White
+                            selectedContainerColor = NothingWhite,
+                            selectedLabelColor = Color.Black
                         )
                     )
                 }
@@ -172,7 +175,7 @@ fun HistoryScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 72.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(filteredItems, key = { it.id }) { item ->

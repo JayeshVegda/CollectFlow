@@ -127,8 +127,9 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 1. RECIPIENT WHATSAPP NUMBER
@@ -424,6 +425,9 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            // Generous bottom spacer ensures the entire last box is readable and accessible above any navigation bar
+            Spacer(modifier = Modifier.height(72.dp))
         }
     }
 

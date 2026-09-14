@@ -6,8 +6,12 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
@@ -16,6 +20,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
@@ -43,8 +48,11 @@ import com.jayesh.cashcollect.ui.insights.InsightsScreen
 import com.jayesh.cashcollect.ui.settings.SettingsScreen
 import com.jayesh.cashcollect.ui.theme.CashCollectTheme
 import com.jayesh.cashcollect.ui.theme.NothingBlack
+import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingGray
+import com.jayesh.cashcollect.ui.theme.NothingMuted
 import com.jayesh.cashcollect.ui.theme.NothingRed
 import com.jayesh.cashcollect.ui.theme.NothingWhite
 import com.jayesh.cashcollect.widget.CashCollectWidgetProvider
@@ -78,6 +86,7 @@ class MainActivity : ComponentActivity() {
 
         val initialCollectionId = intent.getLongExtra("EXTRA_COLLECTION_ID", -1L)
         val openAddDirectly = intent.getBooleanExtra("EXTRA_OPEN_ADD", false)
+        val openQuickCaptureDirectly = intent.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false)
 
         setContent {
             CashCollectTheme {
@@ -115,72 +124,116 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     containerColor = NothingBlack,
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0), // Lets inner TopAppBars handle status bars insets natively!
                     bottomBar = {
                         if (isRootTab) {
-                            NavigationBar(
-                                containerColor = NothingCard
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(
+                                        width = 1.dp,
+                                        color = NothingBorder,
+                                        shape = androidx.compose.ui.graphics.RectangleShape
+                                    )
                             ) {
-                                NavigationBarItem(
-                                    selected = currentScreen is Screen.Collections,
-                                    onClick = { currentScreen = Screen.Collections },
-                                    icon = { Icon(Icons.Default.List, contentDescription = "Collections") },
-                                    label = { Text("COLLECT", fontFamily = FontFamily.Monospace, fontSize = 10.sp) },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = NothingRed,
-                                        selectedTextColor = NothingRed,
-                                        indicatorColor = Color.Transparent,
-                                        unselectedIconColor = NothingGray,
-                                        unselectedTextColor = NothingGray
+                                NavigationBar(
+                                    containerColor = NothingBlack,
+                                    windowInsets = NavigationBarDefaults.windowInsets
+                                ) {
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.Collections,
+                                        onClick = { currentScreen = Screen.Collections },
+                                        icon = { Icon(Icons.Default.List, contentDescription = "Collections") },
+                                        label = {
+                                            Text(
+                                                text = if (currentScreen is Screen.Collections) "[ COLLECT ]" else "COLLECT",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = if (currentScreen is Screen.Collections) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 10.sp,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = NothingWhite,
+                                            selectedTextColor = NothingWhite,
+                                            indicatorColor = Color.Transparent,
+                                            unselectedIconColor = NothingMuted,
+                                            unselectedTextColor = NothingMuted
+                                        )
                                     )
-                                )
-                                NavigationBarItem(
-                                    selected = currentScreen is Screen.Insights,
-                                    onClick = { currentScreen = Screen.Insights },
-                                    icon = { Icon(Icons.Default.Analytics, contentDescription = "Insights") },
-                                    label = { Text("INSIGHTS", fontFamily = FontFamily.Monospace, fontSize = 10.sp) },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = NothingRed,
-                                        selectedTextColor = NothingRed,
-                                        indicatorColor = Color.Transparent,
-                                        unselectedIconColor = NothingGray,
-                                        unselectedTextColor = NothingGray
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.Insights,
+                                        onClick = { currentScreen = Screen.Insights },
+                                        icon = { Icon(Icons.Default.Analytics, contentDescription = "Insights") },
+                                        label = {
+                                            Text(
+                                                text = if (currentScreen is Screen.Insights) "[ INSIGHTS ]" else "INSIGHTS",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = if (currentScreen is Screen.Insights) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 10.sp,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = NothingWhite,
+                                            selectedTextColor = NothingWhite,
+                                            indicatorColor = Color.Transparent,
+                                            unselectedIconColor = NothingMuted,
+                                            unselectedTextColor = NothingMuted
+                                        )
                                     )
-                                )
-                                NavigationBarItem(
-                                    selected = currentScreen is Screen.History,
-                                    onClick = { currentScreen = Screen.History },
-                                    icon = { Icon(Icons.Default.History, contentDescription = "History") },
-                                    label = { Text("HISTORY", fontFamily = FontFamily.Monospace, fontSize = 10.sp) },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = NothingRed,
-                                        selectedTextColor = NothingRed,
-                                        indicatorColor = Color.Transparent,
-                                        unselectedIconColor = NothingGray,
-                                        unselectedTextColor = NothingGray
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.History,
+                                        onClick = { currentScreen = Screen.History },
+                                        icon = { Icon(Icons.Default.History, contentDescription = "History") },
+                                        label = {
+                                            Text(
+                                                text = if (currentScreen is Screen.History) "[ HISTORY ]" else "HISTORY",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = if (currentScreen is Screen.History) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 10.sp,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = NothingWhite,
+                                            selectedTextColor = NothingWhite,
+                                            indicatorColor = Color.Transparent,
+                                            unselectedIconColor = NothingMuted,
+                                            unselectedTextColor = NothingMuted
+                                        )
                                     )
-                                )
-                                NavigationBarItem(
-                                    selected = currentScreen is Screen.Settings,
-                                    onClick = { currentScreen = Screen.Settings },
-                                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                                    label = { Text("SETTINGS", fontFamily = FontFamily.Monospace, fontSize = 10.sp) },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = NothingRed,
-                                        selectedTextColor = NothingRed,
-                                        indicatorColor = Color.Transparent,
-                                        unselectedIconColor = NothingGray,
-                                        unselectedTextColor = NothingGray
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.Settings,
+                                        onClick = { currentScreen = Screen.Settings },
+                                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                                        label = {
+                                            Text(
+                                                text = if (currentScreen is Screen.Settings) "[ SETTINGS ]" else "SETTINGS",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = if (currentScreen is Screen.Settings) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 10.sp,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = NothingWhite,
+                                            selectedTextColor = NothingWhite,
+                                            indicatorColor = Color.Transparent,
+                                            unselectedIconColor = NothingMuted,
+                                            unselectedTextColor = NothingMuted
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }
                 ) { innerPadding ->
-                    Surface(
-                        color = NothingBlack,
+                    Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .consumeWindowInsets(innerPadding)
+                            .background(NothingBlack)
+                            .padding(bottom = innerPadding.calculateBottomPadding())
                     ) {
                         when (val screen = currentScreen) {
                             is Screen.Collections -> {
@@ -188,17 +241,19 @@ class MainActivity : ComponentActivity() {
                                     outstandingList = outstandingList,
                                     pendingList = pendingList,
                                     commissionRatePerThousand = appSettings.commissionRatePerThousand,
+                                    initialOpenQuickCapture = openQuickCaptureDirectly,
                                     onAddCollectionClick = { currentScreen = Screen.AddCollection },
-                                    onQuickCaptureSave = { name, amountPaise ->
+                                    onQuickCaptureSave = { name, amountPaise, note ->
                                         scope.launch {
                                             val customerId = customerRepo.addCustomer(name, null)
                                             collectionRepo.createPendingCollection(
                                                 customerId = customerId,
                                                 amountPaise = amountPaise,
-                                                commissionRateSnapshot = appSettings.commissionRatePerThousand
+                                                commissionRateSnapshot = appSettings.commissionRatePerThousand,
+                                                note = note
                                             )
                                             CashCollectWidgetProvider.notifyDataChanged(this@MainActivity)
-                                            Toast.makeText(this@MainActivity, "Added pending: $name", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(this@MainActivity, "Saved: $name", Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     onCollectionClick = { id -> currentScreen = Screen.Detail(id) },

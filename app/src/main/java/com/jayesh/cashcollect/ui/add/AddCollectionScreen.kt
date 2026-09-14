@@ -60,6 +60,7 @@ import com.jayesh.cashcollect.ui.common.AmountKeypad
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingCardRaised
 import com.jayesh.cashcollect.ui.theme.NothingGray
@@ -126,8 +127,9 @@ fun AddCollectionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 1. CUSTOMER SELECTOR
@@ -413,19 +415,25 @@ fun AddCollectionScreen(
                 enabled = selectedCustomer != null && amountPaise > 0L,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
-                shape = RoundedCornerShape(12.dp)
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NothingWhite,
+                    contentColor = Color.Black,
+                    disabledContainerColor = NothingBorderVisible,
+                    disabledContentColor = NothingMuted
+                ),
+                shape = RoundedCornerShape(999.dp)
             ) {
                 Text(
                     text = "SAVE PENDING COLLECTION",
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    color = Color.White
+                    letterSpacing = 1.sp
                 )
             }
+
+            Spacer(modifier = Modifier.height(72.dp))
         }
     }
 

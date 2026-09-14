@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
 import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingCardRaised
 import com.jayesh.cashcollect.ui.theme.NothingGray
@@ -149,17 +150,20 @@ fun ConfirmBottomSheet(
                 onClick = onConfirmReceiveAndWhatsApp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
-                shape = RoundedCornerShape(12.dp)
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NothingWhite,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(999.dp)
             ) {
                 Text(
                     text = "RECEIVE & OPEN WHATSAPP",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
+                    fontSize = 12.sp,
                     letterSpacing = 0.5.sp,
-                    color = Color.White
+                    color = Color.Black
                 )
             }
 
@@ -167,10 +171,13 @@ fun ConfirmBottomSheet(
 
             OutlinedButton(
                 onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(999.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NothingBorderVisible)
             ) {
-                Text("Cancel", color = NothingGray)
+                Text("CANCEL", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingGray)
             }
         }
     }
