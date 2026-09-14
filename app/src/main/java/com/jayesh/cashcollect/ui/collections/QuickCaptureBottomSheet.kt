@@ -88,7 +88,7 @@ fun QuickCaptureBottomSheet(
         kotlinx.coroutines.delay(100)
         try {
             focusRequester.requestFocus()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {}
     }
 
     val isValid = parsedResult != null &&

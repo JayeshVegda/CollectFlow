@@ -38,6 +38,9 @@ jobs:
             echo '```text' >> $GITHUB_STEP_SUMMARY
             tail -n 120 test_log.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
+            while IFS= read -r line; do
+              echo "::error::$line"
+            done < <(grep -E "(e: |error:|FAILED|FAILURE:)" test_log.txt | tail -n 25)
             exit 1
           }
 
@@ -49,8 +52,20 @@ jobs:
             echo '```text' >> $GITHUB_STEP_SUMMARY
             tail -n 120 assemble_log.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
+            while IFS= read -r line; do
+              echo "::error::$line"
+            done < <(grep -E "(e: |error:|FAILED|FAILURE:)" assemble_log.txt | tail -n 25)
             exit 1
           }
+
+      - name: Upload Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-logs
+          path: |
+            test_log.txt
+            assemble_log.txt
 
       - name: Prepare APK for Release
         run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/CollectFlow-debug.apk
