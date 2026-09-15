@@ -49,9 +49,20 @@ class TdLibClient(
 ) {
 
     companion object {
-        const val LOG_VERBOSITY: Int = 1
+        const val LOG_VERBOSITY: Int = 3
         private const val MAX_LOG_FILE_BYTES = 4L * 1024 * 1024
         private const val CLOSE_TIMEOUT_MS = 5_000L
+
+        /**
+         * Hard ceiling on a single TDLib request.
+         *
+         * Without this, a request that TDLib never answers (which is what
+         * `SetAuthenticationPhoneNumber` did on this device) suspends forever. In TelegramManager
+         * that request is wrapped in the authorization mutex, so one unanswered call permanently
+         * deadlocks the login state machine and the UI stays on CONNECTING with no error.
+         * Timing out converts a silent hang into a real, reportable error.
+         */
+        private const val SEND_TIMEOUT_MS = 30_000L
     }
 
     private val requestIds = AtomicLong(0L)
@@ -107,7 +118,10 @@ class TdLibClient(
 
         runCatching {
             Client.setLogMessageHandler(LOG_VERBOSITY, Client.LogMessageHandler { level, message ->
-                emitLog(if (level <= 1) "E" else "D", message.orEmpty())
+                val text = message.orEmpty()
+                if (text.isNotBlank()) {
+                    emitLog(if (level <= 1) "E" else "D", "tdlib[$level] $text")
+                }
             })
         }.onFailure { emitLog("E", "setLogMessageHandler failed: ${it.message}") }
 
@@ -172,7 +186,17 @@ class TdLibClient(
                     )
                 }
             )
-            return deferred.await()
+            val result = withTimeoutOrNull(SEND_TIMEOUT_MS) { deferred.await() }
+                ?: run {
+                    pendingRequests.remove(queryId)
+                    val name = request.javaClass.simpleName
+                    emitLog("E", "$name timed out after ${SEND_TIMEOUT_MS / 1000}s")
+                    throw TdException(
+                        408,
+                        "TDLib did not answer $name within ${SEND_TIMEOUT_MS / 1000}s"
+                    )
+                }
+            return result
         } catch (e: Exception) {
             pendingRequests.remove(queryId)
             if (e is TdException) throw e
