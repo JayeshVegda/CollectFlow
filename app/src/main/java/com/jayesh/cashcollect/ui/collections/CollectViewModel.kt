@@ -286,17 +286,27 @@ class CollectViewModel(
 
     fun deleteCollection(context: Context, id: Long) {
         viewModelScope.launch {
-            collectionRepo.deleteCollection(id)
-            CashCollectWidgetProvider.notifyDataChanged(context)
-            Toast.makeText(context, "Entry deleted", Toast.LENGTH_SHORT).show()
+            runCatching { collectionRepo.deleteCollection(id) }
+                .onFailure {
+                    Toast.makeText(context, it.message ?: "Could not delete", Toast.LENGTH_LONG).show()
+                }
+                .onSuccess {
+                    CashCollectWidgetProvider.notifyDataChanged(context)
+                    Toast.makeText(context, "Entry deleted", Toast.LENGTH_SHORT).show()
+                }
         }
     }
 
     fun updateCollection(context: Context, id: Long, amountPaise: Long, note: String?) {
         viewModelScope.launch {
-            collectionRepo.updateCollection(id, amountPaise, note)
-            CashCollectWidgetProvider.notifyDataChanged(context)
-            Toast.makeText(context, "Entry updated", Toast.LENGTH_SHORT).show()
+            runCatching { collectionRepo.updateCollection(id, amountPaise, note) }
+                .onFailure {
+                    Toast.makeText(context, it.message ?: "Could not update", Toast.LENGTH_LONG).show()
+                }
+                .onSuccess {
+                    CashCollectWidgetProvider.notifyDataChanged(context)
+                    Toast.makeText(context, "Entry updated", Toast.LENGTH_SHORT).show()
+                }
         }
     }
 
@@ -310,10 +320,15 @@ class CollectViewModel(
     ) {
         viewModelScope.launch {
             val rate = commissionRate.value
-            val newId = collectionRepo.voidAndReplace(originalId, reason, newAmountPaise, rate, note)
-            CashCollectWidgetProvider.notifyDataChanged(context)
-            Toast.makeText(context, "Voided & replaced with #$newId", Toast.LENGTH_SHORT).show()
-            onSuccess(newId)
+            runCatching {
+                collectionRepo.voidAndReplace(originalId, reason, newAmountPaise, rate, note)
+            }.onSuccess { newId ->
+                CashCollectWidgetProvider.notifyDataChanged(context)
+                Toast.makeText(context, "Voided & replaced with #$newId", Toast.LENGTH_SHORT).show()
+                onSuccess(newId)
+            }.onFailure {
+                Toast.makeText(context, it.message ?: "Could not replace", Toast.LENGTH_LONG).show()
+            }
         }
     }
 

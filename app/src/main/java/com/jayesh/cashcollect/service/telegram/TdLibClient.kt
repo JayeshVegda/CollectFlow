@@ -3,6 +3,7 @@ package com.jayesh.cashcollect.service.telegram
 import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -50,6 +51,7 @@ class TdLibClient(
     companion object {
         const val LOG_VERBOSITY: Int = 1
         private const val MAX_LOG_FILE_BYTES = 4L * 1024 * 1024
+        private const val CLOSE_TIMEOUT_MS = 5_000L
     }
 
     private val requestIds = AtomicLong(0L)
@@ -182,9 +184,18 @@ class TdLibClient(
     suspend fun stop() {
         val client = nativeClient ?: return
         nativeClient = null
+        val closed = CompletableDeferred<Unit>()
         runCatching {
-            client.send(TdApi.Close(), Client.ResultHandler { }, Client.ExceptionHandler { })
-        }.onFailure { emitLog("W", "Close failed: ${it.message}") }
+            client.send(
+                TdApi.Close(),
+                Client.ResultHandler { closed.complete(Unit) },
+                Client.ExceptionHandler { closed.complete(Unit) }
+            )
+        }.onFailure {
+            emitLog("W", "Close failed: ${it.message}")
+            closed.complete(Unit)
+        }
+        withTimeoutOrNull(CLOSE_TIMEOUT_MS) { closed.await() }
         pendingRequests.values.forEach { it.cancel() }
         pendingRequests.clear()
         emitLog("I", "TDLib client closed")

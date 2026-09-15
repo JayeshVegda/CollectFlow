@@ -255,22 +255,43 @@ class CollectionRepository(
         }
     }
 
+    /**
+     * Hard-deletes an entry. Refuses to touch anything that represents real money
+     * (RECEIPT_CONFIRMED / CONFIRMED) — those must be voided so the audit trail survives.
+     */
     suspend fun deleteCollection(id: Long) {
-        collectionDao.deleteById(id)
+        database.withTransaction {
+            val existing = collectionDao.getById(id)
+                ?: throw IllegalArgumentException("Collection #$id not found")
+            val status = CollectionStatus.valueOf(existing.status)
+            check(status == CollectionStatus.PENDING || status == CollectionStatus.VOIDED) {
+                "Cannot delete a ${status.name} entry. Void it instead to keep the audit trail."
+            }
+            collectionDao.deleteById(id)
+        }
     }
 
+    /**
+     * Edits an entry in place. Only a PENDING entry may be edited: once cash is in hand the
+     * amount is a committed financial fact and may only be corrected via [voidAndReplace].
+     */
     suspend fun updateCollection(id: Long, amountPaise: Long, note: String?) {
-        val existing = collectionDao.getById(id) ?: return
-        val commPaise = com.jayesh.cashcollect.domain.money.CommissionCalculator.calculate(
-            amountPaise,
-            existing.commissionRateSnapshot
-        )
-        collectionDao.update(
-            existing.copy(
-                amountPaise = amountPaise,
-                commissionPaise = commPaise,
-                note = note
+        require(amountPaise > 0L) { "Amount in paise must be positive: $amountPaise" }
+        database.withTransaction {
+            val existing = collectionDao.getById(id)
+                ?: throw IllegalArgumentException("Collection #$id not found")
+            val status = CollectionStatus.valueOf(existing.status)
+            check(status == CollectionStatus.PENDING) {
+                "Only a PENDING entry can be edited. #$id is ${status.name} — use void & replace."
+            }
+            val commPaise = CommissionCalculator.calculate(amountPaise, existing.commissionRateSnapshot)
+            collectionDao.update(
+                existing.copy(
+                    amountPaise = amountPaise,
+                    commissionPaise = commPaise,
+                    note = note?.trim()?.takeIf { it.isNotEmpty() }
+                )
             )
-        )
+        }
     }
 }

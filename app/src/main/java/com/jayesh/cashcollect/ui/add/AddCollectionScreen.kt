@@ -79,7 +79,7 @@ fun AddCollectionScreen(
     searchResults: List<Customer>,
     commissionRatePerThousand: Int,
     onSearchCustomer: (String) -> Unit,
-    onAddNewCustomer: (name: String, alias: String?) -> Unit,
+    onAddNewCustomer: suspend (name: String, alias: String?) -> Long,
     onSaveCollection: (customerId: Long, amountPaise: Long, note: String?) -> Unit,
     onCheckDuplicate: suspend (customerId: Long, amountPaise: Long) -> Boolean,
     onBackClick: () -> Unit
@@ -480,9 +480,19 @@ fun AddCollectionScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (newCustomerName.isNotBlank()) {
-                            onAddNewCustomer(newCustomerName, newCustomerAlias)
+                        val name = newCustomerName.trim()
+                        if (name.isNotBlank()) {
                             showNewCustomerDialog = false
+                            coroutineScope.launch {
+                                val newId = onAddNewCustomer(name, newCustomerAlias)
+                                selectedCustomer = Customer(
+                                    id = newId,
+                                    name = name,
+                                    alias = newCustomerAlias.trim().takeIf { it.isNotBlank() }
+                                )
+                                searchQuery = ""
+                                onSearchCustomer("")
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(

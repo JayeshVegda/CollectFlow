@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -67,6 +68,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import com.jayesh.cashcollect.ui.dashboard.DashboardScreen
 import com.jayesh.cashcollect.ui.theme.NothingWhite
 import com.jayesh.cashcollect.widget.CashCollectWidgetProvider
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
@@ -155,17 +157,43 @@ class MainActivity : ComponentActivity() {
                     )
                 )
 
-                var currentScreen by remember {
-                    mutableStateOf<Screen>(
+                var screenToken by rememberSaveable {
+                    mutableStateOf(
                         when {
-                            initialCollectionId > 0 -> Screen.Detail(initialCollectionId)
-                            openAddDirectly -> Screen.AddCollection
-                            else -> Screen.Collections
+                            initialCollectionId > 0 -> "detail"
+                            openAddDirectly -> "add"
+                            else -> "collections"
                         }
                     )
                 }
+                var detailId by rememberSaveable { mutableStateOf(initialCollectionId) }
+                val currentScreen: Screen = remember(screenToken, detailId) {
+                    when (screenToken) {
+                        "detail" -> Screen.Detail(detailId)
+                        "add" -> Screen.AddCollection
+                        "insights" -> Screen.Insights
+                        "dashboard" -> Screen.Dashboard
+                        "history" -> Screen.History
+                        "settings" -> Screen.Settings
+                        else -> Screen.Collections
+                    }
+                }
+                val goTo: (Screen) -> Unit = { target ->
+                    screenToken = when (target) {
+                        is Screen.Detail -> {
+                            detailId = target.collectionId
+                            "detail"
+                        }
+                        is Screen.AddCollection -> "add"
+                        is Screen.Insights -> "insights"
+                        is Screen.Dashboard -> "dashboard"
+                        is Screen.History -> "history"
+                        is Screen.Settings -> "settings"
+                        is Screen.Collections -> "collections"
+                    }
+                }
 
-                var shouldOpenQuickCapture by remember {
+                var shouldOpenQuickCapture by rememberSaveable {
                     mutableStateOf(openQuickCaptureDirectly)
                 }
 
@@ -176,19 +204,19 @@ class MainActivity : ComponentActivity() {
                     val i = deepLinkIntent ?: return@LaunchedEffect
                     val collectionId = i.getLongExtra("EXTRA_COLLECTION_ID", -1L)
                     when {
-                        collectionId > 0 -> currentScreen = Screen.Detail(collectionId)
+                        collectionId > 0 -> goTo(Screen.Detail(collectionId))
                         i.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false) -> {
-                            currentScreen = Screen.Collections
+                            goTo(Screen.Collections)
                             shouldOpenQuickCapture = true
                         }
-                        i.getBooleanExtra("EXTRA_OPEN_ADD", false) -> currentScreen = Screen.AddCollection
+                        i.getBooleanExtra("EXTRA_OPEN_ADD", false) -> goTo(Screen.AddCollection)
                     }
                     deepLinkFlow.value = null
                 }
 
 
                 BackHandler(enabled = currentScreen !is Screen.Collections) {
-                    currentScreen = Screen.Collections
+                    goTo(Screen.Collections)
                 }
 
                 val historyList by historyViewModel.historyList.collectAsStateWithLifecycle()
@@ -197,6 +225,9 @@ class MainActivity : ComponentActivity() {
                 val customerSearchResults = remember { MutableStateFlow<List<Customer>>(emptyList()) }
                 val searchResultsState by customerSearchResults.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
+                // One cancellable collector for customer search: a new query cancels the previous
+                // Room Flow instead of leaking a collector per keystroke.
+                var searchJob by remember { mutableStateOf<Job?>(null) }
 
                 val isRootTab = currentScreen is Screen.Collections ||
                         currentScreen is Screen.Insights ||
@@ -220,7 +251,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     NavigationBarItem(
                                         selected = currentScreen is Screen.Collections,
-                                        onClick = { currentScreen = Screen.Collections },
+                                        onClick = { goTo(Screen.Collections) },
                                         icon = { Icon(Icons.Default.List, contentDescription = "Collections") },
                                         label = {
                                             Text(
@@ -241,7 +272,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                     NavigationBarItem(
                                         selected = currentScreen is Screen.Insights,
-                                        onClick = { currentScreen = Screen.Insights },
+                                        onClick = { goTo(Screen.Insights) },
                                         icon = { Icon(Icons.Default.Analytics, contentDescription = "Insights") },
                                         label = {
                                             Text(
@@ -262,7 +293,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                     NavigationBarItem(
                                         selected = currentScreen is Screen.Dashboard,
-                                        onClick = { currentScreen = Screen.Dashboard },
+                                        onClick = { goTo(Screen.Dashboard) },
                                         icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
                                         label = {
                                             Text(
@@ -283,7 +314,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                     NavigationBarItem(
                                         selected = currentScreen is Screen.History,
-                                        onClick = { currentScreen = Screen.History },
+                                        onClick = { goTo(Screen.History) },
                                         icon = { Icon(Icons.Default.History, contentDescription = "History") },
                                         label = {
                                             Text(
@@ -304,7 +335,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                     NavigationBarItem(
                                         selected = currentScreen is Screen.Settings,
-                                        onClick = { currentScreen = Screen.Settings },
+                                        onClick = { goTo(Screen.Settings) },
                                         icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                                         label = {
                                             Text(
@@ -343,9 +374,9 @@ class MainActivity : ComponentActivity() {
                                         shouldOpenQuickCapture = false
                                         intent.removeExtra("EXTRA_OPEN_QUICK_CAPTURE")
                                     },
-                                    onAddCollectionClick = { currentScreen = Screen.AddCollection },
-                                    onCollectionClick = { id -> currentScreen = Screen.Detail(id) },
-                                    onSettingsClick = { currentScreen = Screen.Settings }
+                                    onAddCollectionClick = { goTo(Screen.AddCollection) },
+                                    onCollectionClick = { id -> goTo(Screen.Detail(id)) },
+                                    onSettingsClick = { goTo(Screen.Settings) }
                                 )
                             }
 
@@ -361,12 +392,12 @@ class MainActivity : ComponentActivity() {
                                     appSettings = currentSettings,
                                     telegramAuthState = authState,
                                     onQuickCaptureClick = {
-                                        currentScreen = Screen.Collections
+                                        goTo(Screen.Collections)
                                         shouldOpenQuickCapture = true
                                     },
-                                    onCollectionClick = { id -> currentScreen = Screen.Detail(id) },
-                                    onGoToHistory = { currentScreen = Screen.History },
-                                    onGoToSettings = { currentScreen = Screen.Settings },
+                                    onCollectionClick = { id -> goTo(Screen.Detail(id)) },
+                                    onGoToHistory = { goTo(Screen.History) },
+                                    onGoToSettings = { goTo(Screen.Settings) },
                                     onExportCsv = { historyViewModel.exportCsv(this@MainActivity) }
                                 )
                             }
@@ -377,16 +408,19 @@ class MainActivity : ComponentActivity() {
                                     searchResults = searchResultsState,
                                     commissionRatePerThousand = appSettings.commissionRatePerThousand,
                                     onSearchCustomer = { query ->
-                                        scope.launch {
-                                            app.customerRepository.searchCustomers(query).collect {
-                                                customerSearchResults.value = it
+                                        searchJob?.cancel()
+                                        if (query.isBlank()) {
+                                            customerSearchResults.value = emptyList()
+                                        } else {
+                                            searchJob = scope.launch {
+                                                app.customerRepository.searchCustomers(query).collect {
+                                                    customerSearchResults.value = it
+                                                }
                                             }
                                         }
                                     },
                                     onAddNewCustomer = { name, alias ->
-                                        scope.launch {
-                                            app.customerRepository.addCustomer(name, alias)
-                                        }
+                                        app.customerRepository.addCustomer(name, alias)
                                     },
                                     onSaveCollection = { customerId, amountPaise, note ->
                                         scope.launch {

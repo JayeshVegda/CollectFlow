@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.drinkless.tdlib.TdApi
 import java.io.File
 import java.security.KeyStore
@@ -91,6 +93,11 @@ class TelegramManager(private val context: Context) {
     // Pending dispatches: temporary Message ID -> collectionId
     private val pendingOutboundMessages = ConcurrentHashMap<Long, Long>()
 
+    // Serialises "queue send + record tempId" against "delivery ACK handled", so an ACK that
+    // arrives the instant TDLib accepts the message can never be processed before the tempId
+    // mapping exists (which would strand the entry as RECEIPT_CONFIRMED forever).
+    private val outboundLock = Mutex()
+
     // Callbacks registered for send results
     var onMessageSendSucceeded: ((collectionId: Long) -> Unit)? = null
     var onMessageSendFailed: ((collectionId: Long, error: String) -> Unit)? = null
@@ -126,6 +133,7 @@ class TelegramManager(private val context: Context) {
         private const val PREFS_NAME = "tdlib_secure_prefs"
         private const val PREF_KEY_ENC_KEY = "enc_db_key"
         private const val PREF_KEY_IV = "enc_db_iv"
+        private const val PREF_KEY_FALLBACK = "fallback_raw_key"
         private const val MAX_DIAGNOSTIC_LINES = 300
         private const val STARTUP_TIMEOUT_MS = 30_000L
 
@@ -160,6 +168,7 @@ class TelegramManager(private val context: Context) {
             return
         }
 
+        parametersSent = false
         _authState.value = TelegramAuthState.Initializing
         _connection.value = TelegramConnection.Connecting
 
@@ -178,7 +187,6 @@ class TelegramManager(private val context: Context) {
                         null
                     }
                 )
-                sendTdlibParameters()
                 refreshAuthorizationState()
             } catch (e: Throwable) {
                 val code = (e as? TdException)?.code
@@ -254,8 +262,11 @@ class TelegramManager(private val context: Context) {
 
             is TdApi.UpdateMessageSendSucceeded -> {
                 val tempId = update.oldMessageId
-                val collectionId = pendingOutboundMessages.remove(tempId)
-                    ?: pendingOutboundMessages.remove(update.message.id)
+                val realId = update.message.id
+                val collectionId = outboundLock.withLock {
+                    pendingOutboundMessages.remove(tempId)
+                        ?: pendingOutboundMessages.remove(realId)
+                }
                 if (collectionId != null) {
                     appendDiagnostic("[I] Telegram confirmed delivery for entry #$collectionId")
                     onMessageSendSucceeded?.invoke(collectionId)
@@ -264,8 +275,11 @@ class TelegramManager(private val context: Context) {
 
             is TdApi.UpdateMessageSendFailed -> {
                 val tempId = update.oldMessageId
-                val collectionId = pendingOutboundMessages.remove(tempId)
-                    ?: pendingOutboundMessages.remove(update.message.id)
+                val realId = update.message.id
+                val collectionId = outboundLock.withLock {
+                    pendingOutboundMessages.remove(tempId)
+                        ?: pendingOutboundMessages.remove(realId)
+                }
                 if (collectionId != null) {
                     val errMsg = update.error?.message?.ifBlank { "Error code: ${update.error?.code}" }
                         ?: "Send failed"
@@ -283,6 +297,7 @@ class TelegramManager(private val context: Context) {
             is TdApi.AuthorizationStateWaitTdlibParameters -> {
                 _authState.value = TelegramAuthState.WaitingParameters
                 runCatching { sendTdlibParameters() }
+                    .onFailure { appendDiagnostic("[E] could not send TDLib parameters: ${it.message}") }
             }
 
             is TdApi.AuthorizationStateWaitPhoneNumber -> {
@@ -365,6 +380,7 @@ class TelegramManager(private val context: Context) {
         else -> "Telegram"
     }
 
+    private val parametersMutex = Mutex()
     private var parametersSent = false
 
     private val _transientError = MutableStateFlow<String?>(null)
@@ -376,8 +392,8 @@ class TelegramManager(private val context: Context) {
         _transientError.value = null
     }
 
-    private suspend fun sendTdlibParameters() {
-        if (parametersSent) return
+    private suspend fun sendTdlibParameters() = parametersMutex.withLock {
+        if (parametersSent) return@withLock
         val params = TdApi.SetTdlibParameters().apply {
             databaseDirectory = databaseDir.absolutePath
             filesDirectory = tdFilesDir.absolutePath
@@ -394,9 +410,18 @@ class TelegramManager(private val context: Context) {
             systemVersion = "Android ${android.os.Build.VERSION.RELEASE}"
             applicationVersion = "2.1.0"
         }
-        tdClient.send(params)
+        // Mark as sent before awaiting: TDLib emits UpdateAuthorizationState(WaitTdlibParameters)
+        // as soon as the client exists, and the update collector may call us concurrently. Setting
+        // the flag inside the lock, before the suspending send, makes the call exactly-once.
         parametersSent = true
-        appendDiagnostic("[I] TDLib parameters sent (Keystore-encrypted database)")
+        try {
+            tdClient.send(params)
+            appendDiagnostic("[I] TDLib parameters sent (Keystore-encrypted database)")
+        } catch (e: Throwable) {
+            parametersSent = false
+            appendDiagnostic("[E] SetTdlibParameters failed: ${e.message}")
+            throw e
+        }
     }
 
     /**
@@ -492,6 +517,9 @@ class TelegramManager(private val context: Context) {
         scope.launch {
             runCatching { tdClient.stop() }
             parametersSent = false
+            collectorsStarted = false
+            pendingOutboundMessages.clear()
+            chatCache.clear()
             _authState.value = TelegramAuthState.Closed
             _connection.value = TelegramConnection.Unknown
         }
@@ -546,8 +574,11 @@ class TelegramManager(private val context: Context) {
                 this.inputMessageContent = inputContent
             }
 
-            val sentMsg = tdClient.send(sendReq)
-            pendingOutboundMessages[sentMsg.id] = collection.id
+            val sentMsg = outboundLock.withLock {
+                val queued = tdClient.send(sendReq)
+                pendingOutboundMessages[queued.id] = collection.id
+                queued
+            }
             appendDiagnostic("[I] queued Telegram message tempId=${sentMsg.id} for entry #${collection.id}")
             Result.success(sentMsg.id)
         } catch (e: TdException) {
@@ -678,7 +709,17 @@ class TelegramManager(private val context: Context) {
      */
     private fun getOrCreateDatabaseKey(): ByteArray {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        try {
+
+        // A previous run already had to fall back (KeyStore key rotated or invalidated), and the
+        // TDLib database on disk was created with that stored raw key. Reuse it unconditionally —
+        // otherwise the next launch would mint a different key, find the database unreadable and
+        // wipe the Telegram session on every single start.
+        prefs.getString(PREF_KEY_FALLBACK, null)?.let { return hexToBytes(it) }
+
+        val encKeyHex = prefs.getString(PREF_KEY_ENC_KEY, null)
+        val ivHex = prefs.getString(PREF_KEY_IV, null)
+
+        return try {
             val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             if (!ks.containsAlias(KEYSTORE_ALIAS)) {
                 val kpg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
@@ -696,13 +737,11 @@ class TelegramManager(private val context: Context) {
             }
 
             val secretKey = ks.getKey(KEYSTORE_ALIAS, null) as SecretKey
-            val encKeyHex = prefs.getString(PREF_KEY_ENC_KEY, null)
-            val ivHex = prefs.getString(PREF_KEY_IV, null)
 
             if (encKeyHex != null && ivHex != null) {
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding")
                 cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, hexToBytes(ivHex)))
-                return cipher.doFinal(hexToBytes(encKeyHex))
+                cipher.doFinal(hexToBytes(encKeyHex))
             } else {
                 val rawKey = ByteArray(32).also { SecureRandom().nextBytes(it) }
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -715,19 +754,53 @@ class TelegramManager(private val context: Context) {
                     .putString(PREF_KEY_IV, bytesToHex(iv))
                     .apply()
 
-                return rawKey
+                rawKey
             }
         } catch (e: Exception) {
-            Log.e(TAG, "KeyStore encryption error; using fallback persistent key", e)
-            // Fallback: generate persistent 32 bytes in secure private prefs if Keystore fails on device
-            var fallbackHex = prefs.getString("fallback_raw_key", null)
-            if (fallbackHex == null) {
-                val rawKey = ByteArray(32).also { SecureRandom().nextBytes(it) }
-                fallbackHex = bytesToHex(rawKey)
-                prefs.edit().putString("fallback_raw_key", fallbackHex).apply()
-            }
-            return hexToBytes(fallbackHex)
+            fallbackKeyWithoutKeystore(prefs, e)
         }
+    }
+
+    /**
+     * Called when the AndroidKeyStore key is missing, rotated, or invalidated (which shows up as
+     * [javax.crypto.AEADBadTagException] during unwrap).
+     *
+     * The previous behaviour generated a *fresh random* key on every failure while leaving the old
+     * `tdlib_db/db.sqlite` on disk. TDLib then tried to open that database with a key it was not
+     * created with, answered `Unexpected setTdlibParameters`, and the login flow hung on CONNECTING
+     * forever. Recovery must therefore be: discard the unreadable database and the stale wrapped
+     * key together, then start a fresh one.
+     */
+    private fun fallbackKeyWithoutKeystore(
+        prefs: android.content.SharedPreferences,
+        cause: Throwable?
+    ): ByteArray {
+        if (cause != null) {
+            Log.e(TAG, "AndroidKeyStore unavailable; resetting TDLib database", cause)
+        } else {
+            Log.e(TAG, "AndroidKeyStore key unusable; resetting TDLib database")
+        }
+        appendDiagnostic("[W] Telegram local database key was unusable; starting a fresh database")
+
+        runCatching {
+            val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            if (ks.containsAlias(KEYSTORE_ALIAS)) ks.deleteEntry(KEYSTORE_ALIAS)
+        }
+
+        prefs.edit()
+            .remove(PREF_KEY_ENC_KEY)
+            .remove(PREF_KEY_IV)
+            .remove(PREF_KEY_FALLBACK)
+            .apply()
+
+        runCatching { databaseDir.deleteRecursively() }
+        runCatching { tdFilesDir.deleteRecursively() }
+
+        // Keystore is genuinely unavailable on this device/build: keep one stable key in app-private
+        // storage so a restart reuses the same database instead of wiping it every launch.
+        val rawKey = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        prefs.edit().putString(PREF_KEY_FALLBACK, bytesToHex(rawKey)).apply()
+        return rawKey
     }
 
     // QR-code rendering was removed together with the QR login flow. Login is now performed with
