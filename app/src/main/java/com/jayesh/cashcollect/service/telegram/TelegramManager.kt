@@ -99,15 +99,30 @@ class TelegramManager(private val context: Context) {
     // mapping exists (which would strand the entry as RECEIPT_CONFIRMED forever).
     private val outboundLock = Mutex()
 
+    /**
+     * TDLib permits exactly ONE authorization query in flight at a time. Any second one is
+     * rejected with "Another authorization query has started", which is what silently broke the
+     * login flow: [start] queued a background GetAuthorizationState and the SEND CODE tap then
+     * queued SetAuthenticationPhoneNumber while that was still pending, so every attempt failed.
+     * Every auth-affecting request now runs under this lock.
+     */
+    private val authQueryMutex = Mutex()
+
     // Callbacks registered for send results
     var onMessageSendSucceeded: ((collectionId: Long) -> Unit)? = null
     var onMessageSendFailed: ((collectionId: Long, error: String) -> Unit)? = null
 
     fun isReady(): Boolean = _authState.value is TelegramAuthState.Ready
 
+    /** True once the native client exists, even if the user is not signed in yet. */
+    fun isEngineStarted(): Boolean = tdClient.isStarted
+
     private var currentApiId: Int = 0
     private var currentApiHash: String = ""
     private var collectorsStarted = false
+
+    /** Guards the one-time registration of the TDLib update / log collectors. */
+    private val collectorsLock = Any()
 
     private val databaseDir: File
         get() = File(context.filesDir, "tdlib_db").apply { if (!exists()) mkdirs() }
@@ -176,9 +191,16 @@ class TelegramManager(private val context: Context) {
         _authState.value = TelegramAuthState.Initializing
         _connection.value = TelegramConnection.Connecting
 
+        // Decide *synchronously* whether this call owns collector startup. start() can be invoked
+        // from the Application scope and from a ViewModel at the same time; checking the flag
+        // inside the coroutine let both calls pass the check and register two collectors, which is
+        // why every auth state was processed twice in the on-device log.
+        val startCollectors = synchronized(collectorsLock) {
+            if (collectorsStarted) false else { collectorsStarted = true; true }
+        }
+
         scope.launch {
-            if (!collectorsStarted) {
-                collectorsStarted = true
+            if (startCollectors) {
                 // UNDISPATCHED: run each collector synchronously until it suspends on the flow
                 // subscription. A plain launch() only *schedules* the body, so tdClient.start()
                 // below could create the native client and let TDLib emit its first
@@ -234,14 +256,31 @@ class TelegramManager(private val context: Context) {
         }
     }
 
+    /**
+     * Best-effort state refresh.
+     *
+     * Uses tryLock: if any other authorization query is in flight (login, code, password) the
+     * refresh is skipped entirely rather than queued behind it. Queueing it would either delay the
+     * user's request or, worse, race it and trigger "Another authorization query has started".
+     * The update collector still delivers every state change, so nothing is missed.
+     */
     private suspend fun refreshAuthorizationState() {
-        val state = try {
-            tdClient.send(TdApi.GetAuthorizationState())
-        } catch (e: Exception) {
-            appendDiagnostic("[W] GetAuthorizationState failed: ${e.message}")
-            null
-        } ?: return
-        applyAuthorizationState(state)
+        val lock = authQueryMutex.tryLock()
+        if (!lock) {
+            appendDiagnostic("[I] auth refresh skipped (another authorization query is in flight)")
+            return
+        }
+        try {
+            val state = try {
+                tdClient.send(TdApi.GetAuthorizationState())
+            } catch (e: Exception) {
+                appendDiagnostic("[W] GetAuthorizationState failed: ${e.message}")
+                null
+            } ?: return
+            applyAuthorizationState(state)
+        } finally {
+            authQueryMutex.unlock()
+        }
     }
 
     /**
@@ -461,7 +500,9 @@ class TelegramManager(private val context: Context) {
                 authenticationTokens = emptyArray()
             }
             try {
-                tdClient.send(TdApi.SetAuthenticationPhoneNumber(normalized, settings))
+                authQueryMutex.withLock {
+                    tdClient.send(TdApi.SetAuthenticationPhoneNumber(normalized, settings))
+                }
                 appendDiagnostic("[I] phone number submitted: $normalized")
             } catch (e: Exception) {
                 appendDiagnostic("[E] SetAuthenticationPhoneNumber failed: ${e.message}")
@@ -480,7 +521,9 @@ class TelegramManager(private val context: Context) {
         scope.launch {
             _transientError.value = null
             try {
-                tdClient.send(TdApi.CheckAuthenticationCode(trimmed))
+                authQueryMutex.withLock {
+                    tdClient.send(TdApi.CheckAuthenticationCode(trimmed))
+                }
                 appendDiagnostic("[I] login code submitted")
             } catch (e: Exception) {
                 appendDiagnostic("[E] CheckAuthenticationCode failed: ${e.message}")
@@ -492,7 +535,9 @@ class TelegramManager(private val context: Context) {
     fun resendCode() {
         scope.launch {
             appendDiagnostic("[I] requesting a new login code")
-            tdClient.sendQuietly(TdApi.ResendAuthenticationCode(TdApi.ResendCodeReasonUserRequest()))
+            authQueryMutex.withLock {
+                tdClient.sendQuietly(TdApi.ResendAuthenticationCode(TdApi.ResendCodeReasonUserRequest()))
+            }
         }
     }
 
@@ -507,7 +552,9 @@ class TelegramManager(private val context: Context) {
         scope.launch {
             _transientError.value = null
             try {
-                tdClient.send(TdApi.CheckAuthenticationPassword(password))
+                authQueryMutex.withLock {
+                    tdClient.send(TdApi.CheckAuthenticationPassword(password))
+                }
                 appendDiagnostic("[I] 2FA password submitted")
             } catch (e: Exception) {
                 appendDiagnostic("[E] CheckAuthenticationPassword failed: ${e.message}")
