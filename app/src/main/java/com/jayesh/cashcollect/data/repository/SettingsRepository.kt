@@ -19,14 +19,14 @@ class SettingsRepository(private val settingsDao: SettingsDao) {
     }
 
     suspend fun updateBrotherWhatsAppNumber(number: String) {
-        val current = settingsDao.getSettingsSync() ?: SettingsEntity()
-        settingsDao.insertOrUpdate(current.copy(brotherWhatsAppNumber = number.trim()))
+        settingsDao.ensureRow(SettingsEntity())
+        settingsDao.updateBrotherWhatsAppNumber(number.trim())
     }
 
     suspend fun updateCommissionRate(ratePerThousand: Int) {
         require(ratePerThousand >= 0) { "Rate per thousand cannot be negative" }
-        val current = settingsDao.getSettingsSync() ?: SettingsEntity()
-        settingsDao.insertOrUpdate(current.copy(commissionRatePerThousand = ratePerThousand))
+        settingsDao.ensureRow(SettingsEntity())
+        settingsDao.updateCommissionRate(ratePerThousand)
     }
 
     suspend fun updateLastBackupTimestamp(timestamp: Long = System.currentTimeMillis()) {
@@ -34,8 +34,8 @@ class SettingsRepository(private val settingsDao: SettingsDao) {
     }
 
     suspend fun updateMessageTemplate(template: String) {
-        val current = settingsDao.getSettingsSync() ?: SettingsEntity()
-        settingsDao.insertOrUpdate(current.copy(messageTemplate = template.trim()))
+        settingsDao.ensureRow(SettingsEntity())
+        settingsDao.updateMessageTemplate(template.trim())
     }
 
     suspend fun updateTelegramSettings(
@@ -45,15 +45,13 @@ class SettingsRepository(private val settingsDao: SettingsDao) {
         recipient: String,
         fallbackWhatsApp: Boolean
     ) {
-        val current = settingsDao.getSettingsSync() ?: SettingsEntity()
-        settingsDao.insertOrUpdate(
-            current.copy(
-                telegramEnabled = enabled,
-                telegramApiId = apiId.trim(),
-                telegramApiHash = apiHash.trim(),
-                telegramRecipient = recipient.trim(),
-                telegramFallbackWhatsApp = fallbackWhatsApp
-            )
+        settingsDao.ensureRow(SettingsEntity())
+        settingsDao.updateTelegramSettings(
+            enabled = enabled,
+            apiId = apiId.trim(),
+            apiHash = apiHash.trim(),
+            recipient = recipient.trim(),
+            fallbackWhatsApp = fallbackWhatsApp
         )
     }
 
