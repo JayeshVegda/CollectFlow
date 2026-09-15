@@ -1,12 +1,16 @@
 package com.jayesh.cashcollect
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -28,6 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +45,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -76,9 +82,43 @@ sealed class Screen {
 
 class MainActivity : ComponentActivity() {
 
+    /** Emits each new intent so the Compose tree can react (widget quick-capture, notification tap). */
+    private val deepLinkFlow = MutableStateFlow<Intent?>(null)
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Toast.makeText(
+                this,
+                "Notifications are disabled — receipt reminders and Telegram failure alerts will not appear.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        deepLinkFlow.value = intent
+    }
+
+    /** Android 13+ requires an explicit runtime grant before any notification can be shown. */
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        requestNotificationPermissionIfNeeded()
 
         val app = application as CashCollectApplication
         val initialCollectionId = intent.getLongExtra("EXTRA_COLLECTION_ID", -1L)
@@ -128,6 +168,24 @@ class MainActivity : ComponentActivity() {
                 var shouldOpenQuickCapture by remember {
                     mutableStateOf(openQuickCaptureDirectly)
                 }
+
+                // Widget/notification taps arriving while the app is already alive
+                // (singleTask launch mode) are delivered through onNewIntent.
+                val deepLinkIntent by deepLinkFlow.collectAsStateWithLifecycle()
+                LaunchedEffect(deepLinkIntent) {
+                    val i = deepLinkIntent ?: return@LaunchedEffect
+                    val collectionId = i.getLongExtra("EXTRA_COLLECTION_ID", -1L)
+                    when {
+                        collectionId > 0 -> currentScreen = Screen.Detail(collectionId)
+                        i.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false) -> {
+                            currentScreen = Screen.Collections
+                            shouldOpenQuickCapture = true
+                        }
+                        i.getBooleanExtra("EXTRA_OPEN_ADD", false) -> currentScreen = Screen.AddCollection
+                    }
+                    deepLinkFlow.value = null
+                }
+
 
                 BackHandler(enabled = currentScreen !is Screen.Collections) {
                     currentScreen = Screen.Collections

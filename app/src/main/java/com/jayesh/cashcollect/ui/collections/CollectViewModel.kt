@@ -149,8 +149,11 @@ class CollectViewModel(
             var failed = 0
 
             for (item in items) {
-                val committed = runCatching { collectionRepo.markReceivedAndCommit(item.id) }
-                    .getOrElse { failed++; continue }
+                val committed = runCatching { collectionRepo.markReceivedAndCommit(item.id) }.getOrNull()
+                if (committed == null) {
+                    failed++
+                    continue
+                }
 
                 if (settings.telegramEnabled && telegramManager.isReady()) {
                     val res = telegramManager.sendCollectionReceipt(
