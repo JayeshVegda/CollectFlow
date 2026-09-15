@@ -111,4 +111,38 @@ class AppNotificationManager(private val context: Context) {
             // Permission not granted
         }
     }
+
+    /**
+     * Shown when Telegram auto-send fails. Tapping opens the entry so the operator can send it
+     * via WhatsApp and mark it sent.
+     */
+    fun showDispatchFailedNotification(collectionId: Long, error: String) {
+        val tapIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("EXTRA_COLLECTION_ID", collectionId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            collectionId.toInt(),
+            tapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("Telegram send failed")
+            .setContentText("${error.take(120)}\nTap to open WhatsApp and send manually.")
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(context).notify(
+                NOTIFICATION_ID_BASE + collectionId.toInt(),
+                notification
+            )
+        } catch (e: SecurityException) {
+            // Permission not granted
+        }
+    }
 }

@@ -45,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +89,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.jayesh.cashcollect.service.telegram.TelegramAuthState
+import com.jayesh.cashcollect.service.telegram.TelegramConnection
 import com.jayesh.cashcollect.ui.theme.NothingGreen
 
 @Composable
@@ -100,20 +102,31 @@ fun SettingsRoute(
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val telegramAuthState by viewModel.telegramAuthState.collectAsStateWithLifecycle()
+    val telegramConnection by viewModel.telegramConnection.collectAsStateWithLifecycle()
+    val telegramDiagnostics by viewModel.telegramDiagnostics.collectAsStateWithLifecycle()
+    val telegramTransientError by viewModel.telegramTransientError.collectAsStateWithLifecycle()
 
     SettingsScreen(
         settings = settings,
         telegramAuthState = telegramAuthState,
+        telegramConnection = telegramConnection,
+        telegramTransientError = telegramTransientError,
+        telegramDiagnostics = telegramDiagnostics,
         onSaveNumber = viewModel::saveBrotherNumber,
         onSaveTemplate = viewModel::saveMessageTemplate,
         onSaveRate = viewModel::saveCommissionRate,
         onSaveTelegram = { enabled, id, hash, recipient, fallback ->
             viewModel.saveTelegramSettings(enabled, id, hash, recipient, fallback)
         },
-        onConnectTelegram = viewModel::connectTelegram,
-        onCheckPassword = viewModel::checkTelegramPassword,
+        onStartTelegramLogin = viewModel::startTelegramLogin,
+        onSubmitTelegramCode = viewModel::submitTelegramCode,
+        onResendTelegramCode = viewModel::resendTelegramCode,
+        onSubmitTelegramPassword = viewModel::submitTelegramPassword,
+        onDismissTelegramError = viewModel::clearTelegramTransientError,
+        onRestartTelegramEngine = viewModel::restartTelegramEngine,
         onLogoutTelegram = viewModel::logoutTelegram,
         onTestSendTelegram = { viewModel.testSendTelegram(context) },
+        onClearTelegramDiagnostics = viewModel::clearTelegramDiagnostics,
         onBackupNow = onBackupNow,
         onRestoreBackupClick = onRestoreBackupClick,
         onBackClick = onBackClick
@@ -125,14 +138,22 @@ fun SettingsRoute(
 fun SettingsScreen(
     settings: AppSettings,
     telegramAuthState: TelegramAuthState = TelegramAuthState.Uninitialized,
+    telegramConnection: TelegramConnection = TelegramConnection.Unknown,
+    telegramTransientError: String? = null,
+    telegramDiagnostics: List<String> = emptyList(),
     onSaveNumber: (String) -> Unit,
     onSaveTemplate: (String) -> Unit,
     onSaveRate: (Int) -> Unit,
     onSaveTelegram: (enabled: Boolean, apiId: String, apiHash: String, recipient: String, fallbackWhatsApp: Boolean) -> Unit = { _, _, _, _, _ -> },
-    onConnectTelegram: () -> Unit = {},
-    onCheckPassword: (String) -> Unit = {},
+    onStartTelegramLogin: (String) -> Unit = {},
+    onSubmitTelegramCode: (String) -> Unit = {},
+    onResendTelegramCode: () -> Unit = {},
+    onSubmitTelegramPassword: (String) -> Unit = {},
+    onDismissTelegramError: () -> Unit = {},
+    onRestartTelegramEngine: () -> Unit = {},
     onLogoutTelegram: () -> Unit = {},
     onTestSendTelegram: () -> Unit = {},
+    onClearTelegramDiagnostics: () -> Unit = {},
     onBackupNow: () -> Unit,
     onRestoreBackupClick: () -> Unit,
     onBackClick: () -> Unit
@@ -153,6 +174,34 @@ fun SettingsScreen(
     var tgRecipient by remember(settings.telegramRecipient) { mutableStateOf(settings.telegramRecipient) }
     var tgFallback by remember(settings.telegramFallbackWhatsApp) { mutableStateOf(settings.telegramFallbackWhatsApp) }
     var hashVisible by remember { mutableStateOf(false) }
+
+    // Telegram sign-in flow state (phone -> login code -> 2FA password)
+    var showSignInDialog by remember { mutableStateOf(false) }
+    var phoneInput by remember { mutableStateOf("") }
+    var codeInput by remember { mutableStateOf("") }
+    var passwordInput by remember { mutableStateOf("") }
+
+    LaunchedEffect(telegramAuthState) {
+        when (telegramAuthState) {
+            is TelegramAuthState.Ready -> {
+                showSignInDialog = false
+                codeInput = ""
+                passwordInput = ""
+            }
+
+            is TelegramAuthState.WaitingCode -> {
+                showSignInDialog = true
+                passwordInput = ""
+            }
+
+            is TelegramAuthState.WaitingPassword -> {
+                showSignInDialog = true
+                codeInput = ""
+            }
+
+            else -> Unit
+        }
+    }
 
     var showSavedMessage by remember { mutableStateOf(false) }
 
@@ -278,11 +327,16 @@ fun SettingsScreen(
                         // Status pill
                         val (statusText, statusBg, statusFg) = when (telegramAuthState) {
                             is TelegramAuthState.Ready -> Triple("ONLINE", NothingGreen.copy(alpha = 0.2f), NothingGreen)
-                            is TelegramAuthState.ShowingQr -> Triple("SCAN QR", NothingAmber.copy(alpha = 0.2f), NothingAmber)
+                            is TelegramAuthState.WaitingPhoneNumber -> Triple("SIGN IN", NothingAmber.copy(alpha = 0.2f), NothingAmber)
+                            is TelegramAuthState.WaitingCode -> Triple("CODE REQ", NothingAmber.copy(alpha = 0.2f), NothingAmber)
                             is TelegramAuthState.WaitingPassword -> Triple("2FA REQ", NothingAmber.copy(alpha = 0.2f), NothingAmber)
-                            is TelegramAuthState.WaitingParameters, is TelegramAuthState.Initializing -> Triple("CONNECTING", NothingAmber.copy(alpha = 0.2f), NothingAmber)
+                            is TelegramAuthState.WaitingParameters,
+                            is TelegramAuthState.Initializing,
+                            is TelegramAuthState.LoggingOut -> Triple("CONNECTING", NothingAmber.copy(alpha = 0.2f), NothingAmber)
+
                             is TelegramAuthState.Error -> Triple("ERROR", NothingRed.copy(alpha = 0.2f), NothingRed)
-                            is TelegramAuthState.Uninitialized, is TelegramAuthState.Closed -> Triple("OFFLINE", NothingCardRaised, NothingGray)
+                            is TelegramAuthState.Uninitialized,
+                            is TelegramAuthState.Closed -> Triple("OFFLINE", NothingCardRaised, NothingGray)
                         }
 
                         Box(
@@ -443,17 +497,7 @@ fun SettingsScreen(
                             Text("SAVE CONFIG", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
                         }
 
-                        if (telegramAuthState !is TelegramAuthState.Ready) {
-                            OutlinedButton(
-                                onClick = onConnectTelegram,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Icon(Icons.Default.QrCode, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("SCAN QR", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
-                            }
-                        } else {
+                        if (telegramAuthState is TelegramAuthState.Ready) {
                             OutlinedButton(
                                 onClick = onTestSendTelegram,
                                 modifier = Modifier.weight(1f),
@@ -463,15 +507,69 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("TEST SEND", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
                             }
+                        } else {
+                            OutlinedButton(
+                                onClick = { showSignInDialog = true },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("SIGN IN", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
+                            }
                         }
                     }
 
-                    if (telegramAuthState is TelegramAuthState.Ready) {
+                    // Real error text coming from TDLib is never hidden from the operator.
+                    (telegramAuthState as? TelegramAuthState.Error)?.let { err ->
+                        Text(
+                            text = buildString {
+                                append("ERROR: ")
+                                append(err.message)
+                                err.code?.let { append(" (code ").append(it).append(")") }
+                            },
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = NothingRed
+                        )
+                    }
+
+                    Text(
+                        text = when (telegramConnection) {
+                            TelegramConnection.Online -> "Network: connected to Telegram"
+                            TelegramConnection.Connecting -> "Network: connecting…"
+                            TelegramConnection.Offline -> "Network: no internet"
+                            TelegramConnection.Unknown -> "Network: unknown"
+                        },
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        color = NothingMuted
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         TextButton(
-                            onClick = onLogoutTelegram,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                            onClick = onRestartTelegramEngine,
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text("LOGOUT FROM TELEGRAM", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = NothingRed)
+                            Text(
+                                text = if (telegramAuthState is TelegramAuthState.Initializing) "RECONNECTING…" else "RESTART ENGINE",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                color = NothingGray
+                            )
+                        }
+                        if (telegramAuthState is TelegramAuthState.Ready ||
+                            telegramAuthState is TelegramAuthState.Error
+                        ) {
+                            TextButton(
+                                onClick = onLogoutTelegram,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("LOGOUT", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = NothingRed)
+                            }
                         }
                     }
                 }
@@ -744,116 +842,218 @@ fun SettingsScreen(
         )
     }
 
-    // Telegram QR Dialog
-    if (telegramAuthState is TelegramAuthState.ShowingQr) {
-        val qrState = telegramAuthState as TelegramAuthState.ShowingQr
-        AlertDialog(
-            onDismissRequest = onLogoutTelegram,
-            containerColor = NothingBlack,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
-            title = {
-                Text(
-                    text = "LINK PERSONAL TELEGRAM",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = NothingWhite
-                )
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(240.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White)
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        qrState.qrBitmap?.let { bmp ->
-                            Image(
-                                bitmap = bmp,
-                                contentDescription = "Telegram QR Code",
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } ?: androidx.compose.material3.CircularProgressIndicator(
-                            color = Color.Black,
-                            modifier = Modifier.size(32.dp)
+    // Telegram sign-in dialog: phone number -> login code -> 2FA password
+    if (showSignInDialog && telegramAuthState !is TelegramAuthState.Ready) {
+        TelegramSignInDialog(
+            authState = telegramAuthState,
+            transientError = telegramTransientError,
+            phoneInput = phoneInput,
+            onPhoneChange = { phoneInput = it },
+            codeInput = codeInput,
+            onCodeChange = { codeInput = it },
+            passwordInput = passwordInput,
+            onPasswordChange = { passwordInput = it },
+            onSubmitPhone = onStartTelegramLogin,
+            onSubmitCode = onSubmitTelegramCode,
+            onSubmitPassword = onSubmitTelegramPassword,
+            onResendCode = onResendTelegramCode,
+            onDismiss = {
+                onDismissTelegramError()
+                showSignInDialog = false
+            }
+        )
+    }
+
+@Composable
+private fun TelegramSignInDialog(
+    authState: TelegramAuthState,
+    transientError: String?,
+    phoneInput: String,
+    onPhoneChange: (String) -> Unit,
+    codeInput: String,
+    onCodeChange: (String) -> Unit,
+    passwordInput: String,
+    onPasswordChange: (String) -> Unit,
+    onSubmitPhone: (String) -> Unit,
+    onSubmitCode: (String) -> Unit,
+    onSubmitPassword: (String) -> Unit,
+    onResendCode: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NothingCardRaised,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
+        title = {
+            Text(
+                text = when (authState) {
+                    is TelegramAuthState.WaitingCode -> "ENTER LOGIN CODE"
+                    is TelegramAuthState.WaitingPassword -> "ENTER 2FA PASSWORD"
+                    else -> "SIGN IN TO TELEGRAM"
+                },
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                color = NothingWhite
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                when (val state = authState) {
+                    is TelegramAuthState.WaitingCode -> {
+                        Text(
+                            text = buildString {
+                                append("Telegram sent a login code via ")
+                                append(state.channel)
+                                if (state.phoneNumber.isNotBlank()) {
+                                    append(" to ")
+                                    append(state.phoneNumber)
+                                }
+                                append(".")
+                                if (state.isCodeInTelegramApp) {
+                                    append(
+                                        "\n\nCheck the Telegram app on a device where you are " +
+                                            "already signed in."
+                                    )
+                                }
+                            },
+                            fontSize = 12.sp,
+                            color = NothingGray,
+                            lineHeight = 17.sp
+                        )
+                        TelegramInputField(
+                            value = codeInput,
+                            onValueChange = onCodeChange,
+                            label = "Login code",
+                            keyboardType = KeyboardType.NumberPassword
+                        )
+                    }
+is TelegramAuthState.WaitingPassword -> {
+                        Text(
+                            text = buildString {
+                                append("Your account is protected by 2-Step Verification.")
+                                state.hint?.let {
+                                    append("\nHint: ")
+                                    append(it)
+                                }
+                                state.recoveryEmail?.let {
+                                    append("\nRecovery email: ")
+                                    append(it)
+                                }
+                                append("\n\nWrong password? Just type it again and retry.")
+                            },
+                            fontSize = 12.sp,
+                            color = NothingGray,
+                            lineHeight = 17.sp
+                        )
+                        TelegramInputField(
+                            value = passwordInput,
+                            onValueChange = onPasswordChange,
+                            label = "Cloud password",
+                            keyboardType = KeyboardType.Password,
+                            isPassword = true
                         )
                     }
 
-                    Text(
-                        text = "1. Open Telegram on your phone\n2. Go to Settings → Devices\n3. Tap 'Link Desktop Device'\n4. Scan this QR Code",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                        color = NothingGray,
-                        lineHeight = 18.sp
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = onLogoutTelegram) {
-                    Text("CANCEL", color = NothingRed, fontFamily = FontFamily.Monospace)
-                }
-            }
-        )
-    }
-
-    // Telegram 2FA Password Dialog
-    if (telegramAuthState is TelegramAuthState.WaitingPassword) {
-        var passwordInput by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = onLogoutTelegram,
-            containerColor = NothingCardRaised,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
-            title = {
-                Text(
-                    text = "ENTER 2FA PASSWORD",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = NothingWhite
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Your Telegram account is protected by 2-Step Verification. Enter your cloud password to complete login:",
-                        fontSize = 12.sp,
-                        color = NothingGray
-                    )
-                    OutlinedTextField(
-                        value = passwordInput,
-                        onValueChange = { passwordInput = it },
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NothingWhite,
-                            unfocusedBorderColor = NothingBorder,
-                            focusedTextColor = NothingWhite,
-                            unfocusedTextColor = NothingWhite
+                    else -> {
+                        Text(
+                            text = "Enter the phone number of YOUR Telegram account, with country " +
+                                "code. Telegram will send a login code to the Telegram app or by SMS.",
+                            fontSize = 12.sp,
+                            color = NothingGray,
+                            lineHeight = 17.sp
                         )
+                        TelegramInputField(
+                            value = phoneInput,
+                            onValueChange = onPhoneChange,
+                            label = "+91XXXXXXXXXX",
+                            keyboardType = KeyboardType.Phone
+                        )
+                        (state as? TelegramAuthState.Error)?.let { err ->
+                            Text(
+                                text = buildString {
+                                    append("ERROR: ")
+                                    append(err.message)
+                                    err.code?.let { append(" (code ").append(it).append(")") }
+                                },
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = NothingRed
+                            )
+                        }
+                    }
+                }
+
+                transientError?.let { message ->
+                    Text(
+                        text = message,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = NothingRed
                     )
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { onCheckPassword(passwordInput) },
-                    colors = ButtonDefaults.buttonColors(containerColor = NothingWhite)
-                ) {
-                    Text("SUBMIT", color = Color.Black, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    when (authState) {
+                        is TelegramAuthState.WaitingCode -> onSubmitCode(codeInput)
+                        is TelegramAuthState.WaitingPassword -> onSubmitPassword(passwordInput)
+                        else -> onSubmitPhone(phoneInput)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = NothingWhite)
+            ) {
+                Text(
+                    text = when (authState) {
+                        is TelegramAuthState.WaitingCode -> "SUBMIT CODE"
+                        is TelegramAuthState.WaitingPassword -> "SUBMIT"
+                        else -> "SEND CODE"
+                    },
+                    color = Color.Black,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (authState is TelegramAuthState.WaitingCode) {
+                    TextButton(onClick = onResendCode) {
+                        Text("RESEND", color = NothingGray, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = onLogoutTelegram) {
-                    Text("CANCEL", color = NothingGray, fontFamily = FontFamily.Monospace)
+                TextButton(onClick = onDismiss) {
+                    Text("CLOSE", color = NothingGray, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                 }
             }
+        }
+    )
+}
+
+@Composable
+private fun TelegramInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    keyboardType: KeyboardType,
+    isPassword: Boolean = false
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, color = NothingMuted, fontFamily = FontFamily.Monospace, fontSize = 12.sp) },
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = NothingWhite,
+            unfocusedBorderColor = NothingBorder,
+            focusedTextColor = NothingWhite,
+            unfocusedTextColor = NothingWhite
         )
-    }
+    )
+}
 }

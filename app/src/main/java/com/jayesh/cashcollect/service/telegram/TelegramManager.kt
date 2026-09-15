@@ -1,20 +1,15 @@
 package com.jayesh.cashcollect.service.telegram
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Log
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.service.whatsapp.WhatsAppLauncher
-import io.github.tdlibandroid.ktx.TdClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,24 +24,66 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+/**
+ * Authentication state of the personal Telegram session.
+ *
+ * The QR-code ("link a desktop device") flow was removed in favour of the plain
+ * phone-number + login-code + 2FA flow, which is the flow Telegram itself supports most reliably
+ * and which can be recovered from when a step fails.
+ */
 sealed class TelegramAuthState {
     object Uninitialized : TelegramAuthState()
     object Initializing : TelegramAuthState()
     object WaitingParameters : TelegramAuthState()
-    data class ShowingQr(val link: String, val qrBitmap: ImageBitmap?) : TelegramAuthState()
-    data class WaitingPassword(val passwordHint: String?) : TelegramAuthState()
-    data class Ready(val userId: Long, val firstName: String, val username: String?) : TelegramAuthState()
-    data class Error(val message: String) : TelegramAuthState()
+
+    /** Phone number not submitted yet (or rejected). */
+    data class WaitingPhoneNumber(val lastTriedPhone: String? = null) : TelegramAuthState()
+
+    /** Login code required. [channel] is a human readable description of where it was sent. */
+    data class WaitingCode(
+        val phoneNumber: String,
+        val channel: String,
+        val isCodeInTelegramApp: Boolean
+    ) : TelegramAuthState()
+
+    data class WaitingPassword(
+        val hint: String?,
+        val recoveryEmail: String?
+    ) : TelegramAuthState()
+
+    data class Ready(
+        val userId: Long,
+        val firstName: String,
+        val username: String?
+    ) : TelegramAuthState()
+
+    /** Real, human-readable failure reason (TDLib error text is preserved). */
+    data class Error(val message: String, val code: Int? = null) : TelegramAuthState()
+
+    object LoggingOut : TelegramAuthState()
     object Closed : TelegramAuthState()
 }
+
+/** Network reachability of the TDLib client, shown as a status pill. */
+enum class TelegramConnection { Unknown, Connecting, Online, Offline }
 
 class TelegramManager(private val context: Context) {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var client: TdClient? = null
+
+    private val tdClient = TdLibClient(tag = TAG) { level, message ->
+        Log.println(if (level == "E") Log.ERROR else Log.DEBUG, TAG, message)
+    }
 
     private val _authState = MutableStateFlow<TelegramAuthState>(TelegramAuthState.Uninitialized)
     val authState: StateFlow<TelegramAuthState> = _authState.asStateFlow()
+
+    private val _connection = MutableStateFlow(TelegramConnection.Unknown)
+    val connection: StateFlow<TelegramConnection> = _connection.asStateFlow()
+
+    /** Ring buffer of raw TDLib log lines, surfaced by the in-app diagnostics screen. */
+    private val _diagnostics = MutableStateFlow<List<String>>(emptyList())
+    val diagnostics: StateFlow<List<String>> = _diagnostics.asStateFlow()
 
     // Cache resolved chat IDs: recipient string (username/phone/id) -> chatId
     private val chatCache = ConcurrentHashMap<String, Long>()
@@ -62,6 +99,26 @@ class TelegramManager(private val context: Context) {
 
     private var currentApiId: Int = 0
     private var currentApiHash: String = ""
+    private var collectorsStarted = false
+
+    private val databaseDir: File
+        get() = File(context.filesDir, "tdlib_db").apply { if (!exists()) mkdirs() }
+
+    private val tdFilesDir: File
+        get() = File(context.filesDir, "tdlib_files").apply { if (!exists()) mkdirs() }
+
+    private fun appendDiagnostic(line: String) {
+        val current = _diagnostics.value
+        _diagnostics.value = if (current.size >= MAX_DIAGNOSTIC_LINES) {
+            current.drop(current.size - MAX_DIAGNOSTIC_LINES + 1) + line
+        } else {
+            current + line
+        }
+    }
+
+    fun clearDiagnostics() {
+        _diagnostics.value = emptyList()
+    }
 
     companion object {
         private const val TAG = "TelegramManager"
@@ -69,6 +126,8 @@ class TelegramManager(private val context: Context) {
         private const val PREFS_NAME = "tdlib_secure_prefs"
         private const val PREF_KEY_ENC_KEY = "enc_db_key"
         private const val PREF_KEY_IV = "enc_db_iv"
+        private const val MAX_DIAGNOSTIC_LINES = 300
+        private const val STARTUP_TIMEOUT_MS = 30_000L
 
         init {
             try {
@@ -80,97 +139,116 @@ class TelegramManager(private val context: Context) {
     }
 
     /**
-     * Start/Initialize TDLib native engine with credentials.
+     * Starts the TDLib engine with the given credentials.
+     *
+     * Order matters: the update collector is registered *before* the native client is created, so no
+     * authorization update can be missed. The authoritative current state is then fetched with
+     * [TdApi.GetAuthorizationState], so the UI never depends on catching that first update.
      */
-    fun start(apiId: Int, apiHash: String) {
+    fun start(apiId: Int, apiHash: String, logToFile: Boolean = false) {
         if (apiId <= 0 || apiHash.isBlank()) {
-            _authState.value = TelegramAuthState.Error("API ID and API Hash are required")
+            _authState.value = TelegramAuthState.Error(
+                "API ID and API Hash are required. Create them at my.telegram.org"
+            )
             return
         }
-
         currentApiId = apiId
         currentApiHash = apiHash
 
-        if (client != null) {
+        if (tdClient.isStarted) {
+            scope.launch { refreshAuthorizationState() }
             return
         }
 
         _authState.value = TelegramAuthState.Initializing
+        _connection.value = TelegramConnection.Connecting
 
-        try {
-            val tdlibDir = File(context.filesDir, "tdlib").apply { if (!exists()) mkdirs() }
-
-            val newClient = TdClient(
-                filesDir = tdlibDir.absolutePath,
-                verbosityLevel = 1,
-                apiId = apiId,
-                apiHash = apiHash,
-                dispatcher = Dispatchers.IO
-            )
-
-            client = newClient
-            newClient.init()
-
-            scope.launch {
-                newClient.updates.collect { update ->
-                    handleUpdate(update)
-                }
+        scope.launch {
+            if (!collectorsStarted) {
+                collectorsStarted = true
+                launch { tdClient.updates.collect { handleUpdate(it) } }
+                launch { tdClient.logLines.collect { appendDiagnostic(it) } }
             }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Error initializing TDLib client", e)
-            _authState.value = TelegramAuthState.Error("Init error: ${e.message}")
+            try {
+                removeLegacyUnencryptedDatabase()
+                tdClient.start(
+                    logFilePath = if (logToFile) {
+                        File(databaseDir, "tdlib.log").absolutePath
+                    } else {
+                        null
+                    }
+                )
+                sendTdlibParameters()
+                refreshAuthorizationState()
+            } catch (e: Throwable) {
+                val code = (e as? TdException)?.code
+                Log.e(TAG, "Failed to start TDLib", e)
+                appendDiagnostic("[E] start failed: ${e.message}")
+                _authState.value = TelegramAuthState.Error(
+                    e.message ?: "Could not start the Telegram engine",
+                    code
+                )
+            }
+            delay(STARTUP_TIMEOUT_MS)
+            if (_authState.value is TelegramAuthState.Initializing) {
+                _authState.value = TelegramAuthState.Error(
+                    "Telegram did not respond within ${STARTUP_TIMEOUT_MS / 1000}s. " +
+                        "Check this phone's internet connection."
+                )
+            }
+        }
+    }
+
+    /** Closes and recreates the native client. Use when the session is wedged. */
+    fun restart(logToFile: Boolean = false) {
+        val apiId = currentApiId
+        val apiHash = currentApiHash
+        scope.launch {
+            runCatching { tdClient.stop() }
+            _authState.value = TelegramAuthState.Uninitialized
+            _connection.value = TelegramConnection.Unknown
+            if (apiId > 0 && apiHash.isNotBlank()) {
+                start(apiId, apiHash, logToFile)
+            }
+        }
+    }
+
+    private suspend fun refreshAuthorizationState() {
+        val state = try {
+            tdClient.send(TdApi.GetAuthorizationState())
+        } catch (e: Exception) {
+            appendDiagnostic("[W] GetAuthorizationState failed: ${e.message}")
+            null
+        } ?: return
+        applyAuthorizationState(state)
+    }
+
+    /**
+     * The previous implementation let the third-party wrapper create an *unencrypted* database in
+     * `files/tdlib`. That database cannot be reused with a different encryption key, so it is
+     * removed once, the first time the encrypted database is created.
+     */
+    private fun removeLegacyUnencryptedDatabase() {
+        if (File(context.filesDir, "tdlib_db").exists()) return
+        val legacy = File(context.filesDir, "tdlib")
+        if (legacy.exists() && legacy.deleteRecursively()) {
+            appendDiagnostic("[W] removed legacy unencrypted TDLib database (${legacy.name})")
         }
     }
 
     private suspend fun handleUpdate(update: TdApi.Update) {
         when (update) {
-            is TdApi.UpdateAuthorizationState -> {
-                when (val state = update.authorizationState) {
-                    is TdApi.AuthorizationStateWaitTdlibParameters -> {
-                        _authState.value = TelegramAuthState.WaitingParameters
-                        sendTdlibParameters()
-                    }
+            is TdApi.UpdateAuthorizationState -> applyAuthorizationState(update.authorizationState)
 
-                    is TdApi.AuthorizationStateWaitPhoneNumber -> {
-                        // Request QR Code Auth directly
-                        requestQrCodeAuth()
-                    }
+            is TdApi.UpdateConnectionState -> {
+                _connection.value = when (update.state) {
+                    is TdApi.ConnectionStateReady -> TelegramConnection.Online
+                    is TdApi.ConnectionStateWaitingForNetwork -> TelegramConnection.Offline
+                    is TdApi.ConnectionStateConnecting,
+                    is TdApi.ConnectionStateConnectingToProxy,
+                    is TdApi.ConnectionStateUpdating -> TelegramConnection.Connecting
 
-                    is TdApi.AuthorizationStateWaitOtherDeviceConfirmation -> {
-                        val qrBitmap = generateQrCodeBitmap(state.link, 512)
-                        _authState.value = TelegramAuthState.ShowingQr(state.link, qrBitmap)
-                    }
-
-                    is TdApi.AuthorizationStateWaitPassword -> {
-                        _authState.value = TelegramAuthState.WaitingPassword(state.passwordHint)
-                    }
-
-                    is TdApi.AuthorizationStateReady -> {
-                        try {
-                            val me = client?.send(TdApi.GetMe())
-                            if (me is TdApi.User) {
-                                val uname = me.usernames?.activeUsernames?.firstOrNull()
-                                _authState.value = TelegramAuthState.Ready(
-                                    userId = me.id,
-                                    firstName = me.firstName,
-                                    username = uname
-                                )
-                            } else {
-                                _authState.value = TelegramAuthState.Ready(0L, "Connected", null)
-                            }
-                        } catch (e: Exception) {
-                            _authState.value = TelegramAuthState.Ready(0L, "Connected", null)
-                        }
-                    }
-
-                    is TdApi.AuthorizationStateClosed -> {
-                        _authState.value = TelegramAuthState.Closed
-                        client = null
-                    }
-
-                    is TdApi.AuthorizationStateLoggingOut -> {
-                        _authState.value = TelegramAuthState.Initializing
-                    }
+                    else -> TelegramConnection.Unknown
                 }
             }
 
@@ -179,7 +257,7 @@ class TelegramManager(private val context: Context) {
                 val collectionId = pendingOutboundMessages.remove(tempId)
                     ?: pendingOutboundMessages.remove(update.message.id)
                 if (collectionId != null) {
-                    Log.i(TAG, "Message dispatch confirmed by Telegram server for collection #$collectionId")
+                    appendDiagnostic("[I] Telegram confirmed delivery for entry #$collectionId")
                     onMessageSendSucceeded?.invoke(collectionId)
                 }
             }
@@ -189,25 +267,122 @@ class TelegramManager(private val context: Context) {
                 val collectionId = pendingOutboundMessages.remove(tempId)
                     ?: pendingOutboundMessages.remove(update.message.id)
                 if (collectionId != null) {
-                    val errMsg = update.error?.message?.ifBlank { "Error code: ${update.error?.code}" } ?: "Send failed"
+                    val errMsg = update.error?.message?.ifBlank { "Error code: ${update.error?.code}" }
+                        ?: "Send failed"
                     Log.e(TAG, "Message send failed for collection #$collectionId: $errMsg")
+                    appendDiagnostic("[E] send failed for #$collectionId: $errMsg")
                     onMessageSendFailed?.invoke(collectionId, errMsg)
                 }
             }
         }
     }
 
+    private suspend fun applyAuthorizationState(state: TdApi.AuthorizationState) {
+        appendDiagnostic("[I] auth state -> ${state.javaClass.simpleName}")
+        when (state) {
+            is TdApi.AuthorizationStateWaitTdlibParameters -> {
+                _authState.value = TelegramAuthState.WaitingParameters
+                runCatching { sendTdlibParameters() }
+            }
+
+            is TdApi.AuthorizationStateWaitPhoneNumber -> {
+                _authState.value = TelegramAuthState.WaitingPhoneNumber()
+            }
+
+            is TdApi.AuthorizationStateWaitCode -> {
+                val info = state.codeInfo
+                _authState.value = TelegramAuthState.WaitingCode(
+                    phoneNumber = info?.phoneNumber.orEmpty(),
+                    channel = describeCodeChannel(info?.type),
+                    isCodeInTelegramApp = info?.type is TdApi.AuthenticationCodeTypeTelegramMessage
+                )
+            }
+
+            is TdApi.AuthorizationStateWaitPassword -> {
+                _authState.value = TelegramAuthState.WaitingPassword(
+                    hint = state.passwordHint?.takeIf { it.isNotBlank() },
+                    recoveryEmail = state.recoveryEmailAddressPattern?.takeIf { it.isNotBlank() }
+                )
+            }
+
+            is TdApi.AuthorizationStateWaitRegistration -> {
+                _authState.value = TelegramAuthState.Error(
+                    "This phone number has no Telegram account yet. Sign up in the Telegram app " +
+                        "first, then try again."
+                )
+            }
+
+            is TdApi.AuthorizationStateWaitEmailAddress,
+            is TdApi.AuthorizationStateWaitEmailCode -> {
+                _authState.value = TelegramAuthState.Error(
+                    "Telegram is asking for an email code, which this app cannot complete. " +
+                        "Open Telegram once on this phone to finish, then try again."
+                )
+            }
+
+            is TdApi.AuthorizationStateReady -> {
+                _connection.value = TelegramConnection.Online
+                val me = try {
+                    tdClient.send(TdApi.GetMe())
+                } catch (e: Exception) {
+                    appendDiagnostic("[W] GetMe failed: ${e.message}")
+                    null
+                }
+                _authState.value = if (me is TdApi.User) {
+                    TelegramAuthState.Ready(
+                        userId = me.id,
+                        firstName = me.firstName.orEmpty(),
+                        username = me.usernames?.activeUsernames?.firstOrNull()
+                    )
+                } else {
+                    TelegramAuthState.Ready(0L, "Connected", null)
+                }
+            }
+
+            is TdApi.AuthorizationStateLoggingOut -> {
+                _authState.value = TelegramAuthState.LoggingOut
+            }
+
+            is TdApi.AuthorizationStateClosed -> {
+                _authState.value = TelegramAuthState.Closed
+                _connection.value = TelegramConnection.Unknown
+            }
+
+            else -> appendDiagnostic("[I] unhandled auth state ${state.javaClass.simpleName}")
+        }
+    }
+
+    private fun describeCodeChannel(type: TdApi.AuthenticationCodeType?): String = when (type) {
+        is TdApi.AuthenticationCodeTypeSms -> "SMS"
+        is TdApi.AuthenticationCodeTypeCall -> "phone call"
+        is TdApi.AuthenticationCodeTypeFlashCall -> "flash call"
+        is TdApi.AuthenticationCodeTypeMissedCall -> "missed call"
+        is TdApi.AuthenticationCodeTypeSmsWord -> "SMS"
+        is TdApi.AuthenticationCodeTypeSmsPhrase -> "SMS"
+        is TdApi.AuthenticationCodeTypeTelegramMessage -> "the Telegram app"
+        is TdApi.AuthenticationCodeTypeFragment -> "Fragment"
+        is TdApi.AuthenticationCodeTypeFirebaseAndroid -> "SMS"
+        else -> "Telegram"
+    }
+
+    private var parametersSent = false
+
+    private val _transientError = MutableStateFlow<String?>(null)
+
+    /** Non-fatal error (e.g. a wrong 2FA password) that must not destroy the current auth state. */
+    val transientError: StateFlow<String?> = _transientError.asStateFlow()
+
+    fun clearTransientError() {
+        _transientError.value = null
+    }
+
     private suspend fun sendTdlibParameters() {
-        val c = client ?: return
-        val dbDir = File(context.filesDir, "tdlib_db").apply { if (!exists()) mkdirs() }
-        val filesDir = File(context.filesDir, "tdlib_files").apply { if (!exists()) mkdirs() }
-
-        val encryptionKey = getOrCreateDatabaseKey()
-
+        if (parametersSent) return
         val params = TdApi.SetTdlibParameters().apply {
-            databaseDirectory = dbDir.absolutePath
-            this.filesDirectory = filesDir.absolutePath
-            databaseEncryptionKey = encryptionKey
+            databaseDirectory = databaseDir.absolutePath
+            filesDirectory = tdFilesDir.absolutePath
+            // 256-bit key protected by the Android KeyStore. Required to read the local database.
+            databaseEncryptionKey = getOrCreateDatabaseKey()
             useFileDatabase = true
             useChatInfoDatabase = true
             useMessageDatabase = true
@@ -215,59 +390,122 @@ class TelegramManager(private val context: Context) {
             apiId = currentApiId
             apiHash = currentApiHash
             systemLanguageCode = "en"
-            deviceModel = "Nothing Phone (2a) Plus"
-            systemVersion = "Android 15"
-            applicationVersion = "2.0.0"
+            deviceModel = android.os.Build.MODEL ?: "Android"
+            systemVersion = "Android ${android.os.Build.VERSION.RELEASE}"
+            applicationVersion = "2.1.0"
         }
-
-        try {
-            c.send(params)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to send TdlibParameters", e)
-            _authState.value = TelegramAuthState.Error("Parameters failed: ${e.message}")
-        }
+        tdClient.send(params)
+        parametersSent = true
+        appendDiagnostic("[I] TDLib parameters sent (Keystore-encrypted database)")
     }
 
     /**
-     * Request QR Code login from TDLib.
+     * Step 1 of login: submit the phone number. Telegram then sends a login code (usually to the
+     * Telegram app itself, sometimes by SMS).
      */
-    fun requestQrCodeAuth() {
+    fun requestLogin(phoneNumber: String, isCurrentPhoneNumber: Boolean = false) {
+        val normalized = normalizePhoneNumber(phoneNumber)
+        if (normalized.length < 8) {
+            _authState.value = TelegramAuthState.Error(
+                "Enter the Telegram phone number with country code, for example +919510233829"
+            )
+            return
+        }
         scope.launch {
+            _transientError.value = null
+            _authState.value = TelegramAuthState.Initializing
+            val settings = TdApi.PhoneNumberAuthenticationSettings().apply {
+                allowFlashCall = false
+                allowMissedCall = false
+                isCurrentPhoneNumber = isCurrentPhoneNumber
+                hasUnknownPhoneNumber = false
+                allowSmsRetrieverApi = false
+                firebaseAuthenticationSettings = TdApi.FirebaseAuthenticationSettingsAndroid()
+                authenticationTokens = emptyArray()
+            }
             try {
-                client?.send(TdApi.RequestQrCodeAuthentication())
+                tdClient.send(TdApi.SetAuthenticationPhoneNumber(normalized, settings))
+                appendDiagnostic("[I] phone number submitted: $normalized")
             } catch (e: Exception) {
-                Log.e(TAG, "RequestQrCodeAuthentication failed", e)
+                appendDiagnostic("[E] SetAuthenticationPhoneNumber failed: ${e.message}")
+                _authState.value = TelegramAuthState.Error(
+                    e.message ?: "Telegram rejected that phone number",
+                    (e as? TdException)?.code
+                )
             }
         }
     }
 
-    /**
-     * Submit 2FA password if user account requires it.
-     */
-    fun checkPassword(password: String) {
+    /** Step 2 of login: submit the code Telegram just sent. */
+    fun submitCode(code: String) {
+        val trimmed = code.filter { it.isLetterOrDigit() }
+        if (trimmed.isEmpty()) return
         scope.launch {
+            _transientError.value = null
             try {
-                val res = client?.send(TdApi.CheckAuthenticationPassword(password))
-                if (res is TdApi.Error) {
-                    _authState.value = TelegramAuthState.Error("Invalid 2FA password: ${res.message}")
-                }
+                tdClient.send(TdApi.CheckAuthenticationCode(trimmed))
+                appendDiagnostic("[I] login code submitted")
             } catch (e: Exception) {
-                _authState.value = TelegramAuthState.Error("Password check error: ${e.message}")
+                appendDiagnostic("[E] CheckAuthenticationCode failed: ${e.message}")
+                _transientError.value = e.message ?: "Telegram rejected that login code"
             }
         }
     }
 
+    fun resendCode() {
+        scope.launch {
+            appendDiagnostic("[I] requesting a new login code")
+            tdClient.sendQuietly(TdApi.ResendAuthenticationCode(TdApi.ResendCodeReasonUserRequest()))
+        }
+    }
+
     /**
-     * Log out session.
+     * Step 3 of login: submit the 2FA cloud password.
+     *
+     * On failure only [transientError] is set — the [TelegramAuthState.WaitingPassword] state is
+     * preserved so a typo does not lock the user out of the dialog.
      */
+    fun submitPassword(password: String) {
+        if (password.isEmpty()) return
+        scope.launch {
+            _transientError.value = null
+            try {
+                tdClient.send(TdApi.CheckAuthenticationPassword(password))
+                appendDiagnostic("[I] 2FA password submitted")
+            } catch (e: Exception) {
+                appendDiagnostic("[E] CheckAuthenticationPassword failed: ${e.message}")
+                _transientError.value = e.message ?: "Wrong 2FA password"
+            }
+        }
+    }
+
     fun logOut() {
         scope.launch {
-            try {
-                client?.send(TdApi.LogOut())
-            } catch (e: Exception) {
-                Log.e(TAG, "LogOut error", e)
-            }
+            _authState.value = TelegramAuthState.LoggingOut
+            _transientError.value = null
+            chatCache.clear()
+            tdClient.sendQuietly(TdApi.LogOut())
         }
+    }
+
+    /** Fully stops the native engine (used by the diagnostics screen). */
+    fun shutdown() {
+        scope.launch {
+            runCatching { tdClient.stop() }
+            parametersSent = false
+            _authState.value = TelegramAuthState.Closed
+            _connection.value = TelegramConnection.Unknown
+        }
+    }
+
+    private fun normalizePhoneNumber(raw: String): String {
+        val cleaned = raw.trim()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("(", "")
+            .replace(")", "")
+        if (cleaned.isEmpty()) return ""
+        return if (cleaned.startsWith("+")) cleaned else "+$cleaned"
     }
 
     /**
@@ -278,7 +516,9 @@ class TelegramManager(private val context: Context) {
         recipient: String,
         template: String
     ): Result<Long> {
-        val c = client ?: return Result.failure(IllegalStateException("Telegram client is not running"))
+        if (!tdClient.isStarted) {
+            return Result.failure(IllegalStateException("Telegram engine is not running"))
+        }
 
         if (_authState.value !is TelegramAuthState.Ready) {
             return Result.failure(IllegalStateException("Telegram is not logged in"))
@@ -307,16 +547,13 @@ class TelegramManager(private val context: Context) {
                 this.inputMessageContent = inputContent
             }
 
-            val sentMsg = c.send(sendReq)
-            if (sentMsg is TdApi.Message) {
-                pendingOutboundMessages[sentMsg.id] = collection.id
-                Log.i(TAG, "Enqueued TDLib message tempId=${sentMsg.id} for collection #${collection.id}")
-                Result.success(sentMsg.id)
-            } else if (sentMsg is TdApi.Error) {
-                Result.failure(Exception(sentMsg.message))
-            } else {
-                Result.failure(Exception("Unknown TDLib response: $sentMsg"))
-            }
+            val sentMsg = tdClient.send(sendReq)
+            pendingOutboundMessages[sentMsg.id] = collection.id
+            appendDiagnostic("[I] queued Telegram message tempId=${sentMsg.id} for entry #${collection.id}")
+            Result.success(sentMsg.id)
+        } catch (e: TdException) {
+            appendDiagnostic("[E] Telegram send failed: ${e.message}")
+            Result.failure(Exception(e.message))
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send Telegram message", e)
             Result.failure(e)
@@ -327,44 +564,113 @@ class TelegramManager(private val context: Context) {
      * Resolves username, numeric chat ID, or phone to TDLib chatId.
      */
     private suspend fun resolveChatId(recipient: String): Long? {
-        val c = client ?: return null
+        if (!tdClient.isStarted) return null
 
-        chatCache[recipient]?.let { return it }
+        val key = recipient.trim()
+        chatCache[key]?.let { return it }
 
-        // 1. Numeric ID
-        val numericId = recipient.toLongOrNull()
-        if (numericId != null) {
-            chatCache[recipient] = numericId
-            return numericId
-        }
-
-        // 2. Username search (e.g. @brother or brother)
-        val username = recipient.removePrefix("@")
-        try {
-            val chat = c.send(TdApi.SearchPublicChat(username))
-            if (chat is TdApi.Chat) {
-                chatCache[recipient] = chat.id
-                return chat.id
+        // A phone number must never be used directly as a chat id: that could deliver the receipt
+        // to an unrelated chat. Resolve it to a real user first.
+        if (looksLikePhoneNumber(key)) {
+            val userId = resolveUserIdByPhone(key)
+            val chatId = userId?.let { createPrivateChat(it) }
+            if (chatId != null) {
+                chatCache[key] = chatId
+                return chatId
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "SearchPublicChat failed for $username: ${e.message}")
+            appendDiagnostic("[W] no Telegram user found for phone number $key")
+            return null
         }
 
-        // 3. Fallback: Search Contacts
-        try {
-            val contacts = c.send(TdApi.SearchContacts(username, 5))
-            if (contacts is TdApi.Users && contacts.userIds.isNotEmpty()) {
-                val userId = contacts.userIds[0]
-                val privChat = c.send(TdApi.CreatePrivateChat(userId, false))
-                if (privChat is TdApi.Chat) {
-                    chatCache[recipient] = privChat.id
-                    return privChat.id
+        // Pure numeric input that is not a phone number: treat as an explicit Telegram chat id.
+        key.toLongOrNull()?.let { numericId ->
+            if (numericId != 0L) {
+                chatCache[key] = numericId
+                return numericId
+            }
+        }
+
+        val username = key.removePrefix("@")
+
+        // 1. Public username (e.g. @brother)
+        val publicChat = tdClient.sendQuietly(TdApi.SearchPublicChat(username))
+        if (publicChat is TdApi.Chat) {
+            chatCache[key] = publicChat.id
+            return publicChat.id
+        }
+        if (publicChat is TdApi.Error) {
+            appendDiagnostic("[W] SearchPublicChat($username): ${publicChat.message}")
+        }
+
+        // 2. Existing contact
+        val contactMatch = tdClient.sendQuietly(TdApi.SearchContacts(username, 5))
+        if (contactMatch is TdApi.Users && contactMatch.userIds.isNotEmpty()) {
+            createPrivateChat(contactMatch.userIds[0])?.let { chatId ->
+                chatCache[key] = chatId
+                return chatId
+            }
+        }
+
+        // 3. Full display name
+        if (key != username) {
+            val nameMatch = tdClient.sendQuietly(TdApi.SearchContacts(key, 5))
+            if (nameMatch is TdApi.Users && nameMatch.userIds.isNotEmpty()) {
+                createPrivateChat(nameMatch.userIds[0])?.let { chatId ->
+                    chatCache[key] = chatId
+                    return chatId
                 }
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "SearchContacts failed for $username: ${e.message}")
         }
 
+        return null
+    }
+
+    private fun looksLikePhoneNumber(value: String): Boolean {
+        val trimmed = value.trim()
+        if (trimmed.startsWith("+")) return true
+        val digits = trimmed.filter { it.isDigit() }
+        return digits.length in 10..15 && digits.length == trimmed.length
+    }
+
+    /**
+     * Telegram only resolves arbitrary phone numbers after they have been imported as contacts,
+     * so the number is imported first and then looked up.
+     */
+    private suspend fun resolveUserIdByPhone(phone: String): Long? {
+        val normalized = normalizePhoneNumber(phone)
+
+        val imported = tdClient.sendQuietly(
+            TdApi.ImportContacts(
+                arrayOf(
+                    TdApi.ImportedContact().apply {
+                        phoneNumber = normalized
+                        firstName = "Receipt Recipient"
+                        lastName = ""
+                        note = TdApi.FormattedText().apply {
+                            text = "Added by CollectFlow"
+                            entities = emptyArray()
+                        }
+                    }
+                )
+            )
+        )
+        if (imported is TdApi.ImportedContacts) {
+            val userId = imported.userIds.firstOrNull { it != 0L }
+            if (userId != null) return userId
+        }
+
+        val user = tdClient.sendQuietly(TdApi.SearchUserByPhoneNumber(normalized, false))
+        if (user is TdApi.User) return user.id
+
+        return null
+    }
+
+    private suspend fun createPrivateChat(userId: Long): Long? {
+        val chat = tdClient.sendQuietly(TdApi.CreatePrivateChat(userId, false))
+        if (chat is TdApi.Chat) return chat.id
+        if (chat is TdApi.Error) {
+            appendDiagnostic("[W] CreatePrivateChat($userId): ${chat.message}")
+        }
         return null
     }
 
@@ -425,27 +731,8 @@ class TelegramManager(private val context: Context) {
         }
     }
 
-    private fun generateQrCodeBitmap(contents: String, size: Int): ImageBitmap? {
-        return try {
-            val writer = QRCodeWriter()
-            val bitMatrix = writer.encode(contents, BarcodeFormat.QR_CODE, size, size)
-            val width = bitMatrix.width
-            val height = bitMatrix.height
-            val pixels = IntArray(width * height)
-            for (y in 0 until height) {
-                val offset = y * width
-                for (x in 0 until width) {
-                    pixels[offset + x] = if (bitMatrix.get(x, y)) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
-                }
-            }
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-            bitmap.asImageBitmap()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to render QR Code bitmap", e)
-            null
-        }
-    }
+    // QR-code rendering was removed together with the QR login flow. Login is now performed with
+    // the phone number + login code + 2FA password, and the zxing dependency is no longer needed.
 
     private fun bytesToHex(bytes: ByteArray): String =
         bytes.joinToString("") { "%02x".format(it) }

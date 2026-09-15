@@ -245,7 +245,9 @@ fun DashboardScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 val dotColor = when (telegramAuthState) {
                                     is TelegramAuthState.Ready -> NothingGreen
-                                    is TelegramAuthState.ShowingQr,
+                                    is TelegramAuthState.Error -> NothingRed
+                                    is TelegramAuthState.WaitingPhoneNumber,
+                                    is TelegramAuthState.WaitingCode,
                                     is TelegramAuthState.WaitingPassword -> NothingAmber
                                     else -> if (appSettings.telegramEnabled) NothingAmber else NothingMuted
                                 }
@@ -269,9 +271,11 @@ fun DashboardScreen(
                                     val userStr = telegramAuthState.username?.let { "@$it" } ?: telegramAuthState.firstName
                                     "ONLINE ($userStr)"
                                 }
-                                is TelegramAuthState.ShowingQr -> "SCAN QR"
+                                is TelegramAuthState.WaitingPhoneNumber -> "SIGN IN NEEDED"
+                                is TelegramAuthState.WaitingCode -> "NEEDS LOGIN CODE"
                                 is TelegramAuthState.WaitingPassword -> "NEEDS 2FA"
                                 is TelegramAuthState.Initializing -> "CONNECTING..."
+                                is TelegramAuthState.Error -> "ERROR"
                                 else -> if (appSettings.telegramEnabled) "OFFLINE" else "DISABLED"
                             }
                             Text(
@@ -279,7 +283,11 @@ fun DashboardScreen(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (telegramAuthState is TelegramAuthState.Ready) NothingGreen else NothingAmber
+                                color = when (telegramAuthState) {
+                                    is TelegramAuthState.Ready -> NothingGreen
+                                    is TelegramAuthState.Error -> NothingRed
+                                    else -> NothingAmber
+                                }
                             )
                         }
 

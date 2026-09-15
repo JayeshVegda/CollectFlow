@@ -53,5 +53,10 @@ data class CollectionEntity(
     @ColumnInfo(name = "replaces_id")
     val replacesId: Long? = null,
     @ColumnInfo(name = "note")
-    val note: String? = null
+    val note: String? = null,
+    /** Reason the last Telegram dispatch failed, if any. Cleared on a successful send. */
+    @ColumnInfo(name = "last_dispatch_error")
+    val lastDispatchError: String? = null,
+    @ColumnInfo(name = "last_dispatch_attempt_at")
+    val lastDispatchAttemptAt: Long? = null
 )

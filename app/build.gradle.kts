@@ -94,12 +94,11 @@ dependencies {
     compileOnly("com.google.errorprone:error_prone_annotations:2.20.0")
     compileOnly("com.google.code.findbugs:jsr305:3.0.2")
 
-    // TDLib native prebuilt binary (arm64-v8a, Android 15 16KB-page-size aligned) & Kotlin Coroutines wrapper
+    // TDLib native prebuilt binary (arm64-v8a, 16 KB page aligned ELF) plus the official TDLib
+    // Java bindings (org.drinkless.tdlib). The app talks to TDLib through its own small coroutine
+    // wrapper (service/telegram/TdLibClient.kt), so that database parameters, native logging and
+    // the initialization order are fully under this app's control.
     implementation(files("libs/core-release.aar"))
-    implementation(files("libs/ktx-release.aar"))
-
-    // Pure-Java QR code generator for Telegram QR login display in Compose
-    implementation("com.google.zxing:core:3.5.3")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

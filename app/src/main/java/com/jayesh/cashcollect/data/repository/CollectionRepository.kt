@@ -139,9 +139,49 @@ class CollectionRepository(
 
             val updated = entity.copy(
                 status = CollectionStatus.CONFIRMED.name,
-                confirmedSentAt = System.currentTimeMillis()
+                confirmedSentAt = System.currentTimeMillis(),
+                lastDispatchError = null
             )
             collectionDao.update(updated)
+        }
+    }
+
+    /**
+     * Idempotent confirm used by the Telegram delivery-ACK callback. Never throws when the entry
+     * was already confirmed, voided or deleted — the ACK can arrive after the operator acted.
+     */
+    suspend fun confirmSentSafely(id: Long) {
+        database.withTransaction {
+            val entity = collectionDao.getById(id) ?: return@withTransaction
+            val current = CollectionStatus.valueOf(entity.status)
+            if (current == CollectionStatus.CONFIRMED || current == CollectionStatus.VOIDED) {
+                return@withTransaction
+            }
+            CollectionStateMachine.assertValidTransition(current, CollectionStatus.CONFIRMED)
+            collectionDao.update(
+                entity.copy(
+                    status = CollectionStatus.CONFIRMED.name,
+                    confirmedSentAt = System.currentTimeMillis(),
+                    lastDispatchError = null,
+                    lastDispatchAttemptAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * Records a failed Telegram dispatch WITHOUT changing the cash state. The operator can then
+     * fall back to WhatsApp and mark the entry sent manually.
+     */
+    suspend fun markDispatchFailed(id: Long, error: String) {
+        database.withTransaction {
+            val entity = collectionDao.getById(id) ?: return@withTransaction
+            collectionDao.update(
+                entity.copy(
+                    lastDispatchError = error.take(500),
+                    lastDispatchAttemptAt = System.currentTimeMillis()
+                )
+            )
         }
     }
 

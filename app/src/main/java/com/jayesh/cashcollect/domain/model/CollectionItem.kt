@@ -20,7 +20,10 @@ data class CollectionItem(
     val voidReason: String? = null,
     val replacedById: Long? = null,
     val replacesId: Long? = null,
-    val note: String? = null
+    val note: String? = null,
+    /** Reason the last Telegram dispatch failed, if any. Cleared on a successful send. */
+    val lastDispatchError: String? = null,
+    val lastDispatchAttemptAt: Long? = null
 ) {
     val amount: Paise get() = Paise(amountPaise)
     val commission: Paise get() = Paise(commissionPaise)
