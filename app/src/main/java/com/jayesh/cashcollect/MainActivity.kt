@@ -431,13 +431,13 @@ class MainActivity : ComponentActivity() {
                                                 note = note
                                             )
                                             CashCollectWidgetProvider.notifyDataChanged(this@MainActivity)
-                                            currentScreen = Screen.Collections
+                                            goTo(Screen.Collections)
                                         }
                                     },
                                     onCheckDuplicate = { customerId, amountPaise ->
                                         app.collectionRepository.checkRecentDuplicate(customerId, amountPaise)
                                     },
-                                    onBackClick = { currentScreen = Screen.Collections }
+                                    onBackClick = { goTo(Screen.Collections) }
                                 )
                             }
 
@@ -462,18 +462,18 @@ class MainActivity : ComponentActivity() {
                                             newAmountPaise = newAmountPaise,
                                             note = note,
                                             onSuccess = {
-                                                currentScreen = Screen.Collections
+                                                goTo(Screen.Collections)
                                             }
                                         )
                                     },
-                                    onBackClick = { currentScreen = Screen.Collections }
+                                    onBackClick = { goTo(Screen.Collections) }
                                 )
                             }
 
                             is Screen.History -> {
                                 HistoryRoute(
                                     viewModel = historyViewModel,
-                                    onItemClick = { id -> currentScreen = Screen.Detail(id) }
+                                    onItemClick = { id -> goTo(Screen.Detail(id)) }
                                 )
                             }
 
@@ -507,7 +507,7 @@ class MainActivity : ComponentActivity() {
                                             Toast.LENGTH_LONG
                                         ).show()
                                     },
-                                    onBackClick = { currentScreen = Screen.Collections }
+                                    onBackClick = { goTo(Screen.Collections) }
                                 )
                             }
                         }
