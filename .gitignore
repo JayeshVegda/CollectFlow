@@ -21,3 +21,9 @@ app/libs/*.aar
 build-output/
 CollectFlow-APKs/
 *.apk
+
+# Signing keystore (never commit)
+keystore/
+*.jks
+*.keystore
+local.properties
