@@ -28,6 +28,11 @@ class CollectViewModel(
     private val telegramManager: com.jayesh.cashcollect.service.telegram.TelegramManager
 ) : ViewModel() {
 
+    companion object {
+        /** Automatic reason stored when an entry is voided with a single swipe (no dialog). */
+        private const val VOID_REASON_QUICK = "Quick swipe void (no reason given)"
+    }
+
     val outstandingList: StateFlow<List<CollectionItem>> = collectionRepo.getOutstandingConfirmations()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -86,10 +91,22 @@ class CollectViewModel(
         }
     }
 
+    /**
+     * Swipe-right action: commit the cash receipt immediately — no confirmation sheet.
+     *
+     * - Telegram enabled + online  -> background send; the ACK later marks the entry CONFIRMED.
+     * - Telegram not ready/disabled -> WhatsApp opens immediately with the prefilled receipt.
+     * - Telegram failed             -> the failure is stored on the entry and the row offers
+     *                                  WhatsApp / retry, so a receipt is never silently lost.
+     */
     fun confirmReceive(context: Context, item: CollectionItem) {
         viewModelScope.launch {
+            val committed = runCatching { collectionRepo.markReceivedAndCommit(item.id) }
+                .getOrElse { error ->
+                    Toast.makeText(context, "Could not confirm: ${error.message}", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
             dismissConfirm()
-            val committed = collectionRepo.markReceivedAndCommit(item.id)
             CashCollectWidgetProvider.notifyDataChanged(context)
             notificationManager.showImmediateReceiptNotification(committed)
 
@@ -101,17 +118,19 @@ class CollectViewModel(
                     template = settings.messageTemplate
                 )
                 if (res.isSuccess) {
-                    Toast.makeText(context, "Telegram auto-send queued ⚡", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Telegram sending in background", Toast.LENGTH_SHORT).show()
                     return@launch
-                } else {
-                    if (!settings.telegramFallbackWhatsApp) {
-                        Toast.makeText(context, "Telegram error: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
-                        return@launch
-                    }
                 }
+                val reason = res.exceptionOrNull()?.message ?: "Telegram send failed"
+                collectionRepo.markDispatchFailed(committed.id, reason)
+                CashCollectWidgetProvider.notifyDataChanged(context)
+                if (!settings.telegramFallbackWhatsApp) {
+                    Toast.makeText(context, "Telegram failed: $reason", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+                Toast.makeText(context, "Telegram failed — opening WhatsApp", Toast.LENGTH_SHORT).show()
             }
 
-            // Fallback to WhatsApp
             openWhatsAppInternal(context, committed, settings)
         }
     }
@@ -120,7 +139,113 @@ class CollectViewModel(
         confirmReceive(context, item)
     }
 
+    /** Bulk action: commit several entries at once and dispatch them all. */
+    fun receiveAndSendAll(context: Context, items: List<CollectionItem>) {
+        if (items.isEmpty()) return
+        viewModelScope.launch {
+            val settings = settingsRepo.getSettingsSync()
+            var telegramQueued = 0
+            var whatsAppNeeded = 0
+            var failed = 0
+
+            for (item in items) {
+                val committed = runCatching { collectionRepo.markReceivedAndCommit(item.id) }
+                    .getOrElse { failed++; continue }
+
+                if (settings.telegramEnabled && telegramManager.isReady()) {
+                    val res = telegramManager.sendCollectionReceipt(
+                        collection = committed,
+                        recipient = settings.telegramRecipient,
+                        template = settings.messageTemplate
+                    )
+                    if (res.isSuccess) {
+                        telegramQueued++
+                        continue
+                    }
+                    val reason = res.exceptionOrNull()?.message ?: "Telegram send failed"
+                    collectionRepo.markDispatchFailed(committed.id, reason)
+                }
+                whatsAppNeeded++
+            }
+
+            CashCollectWidgetProvider.notifyDataChanged(context)
+            Toast.makeText(
+                context,
+                "Telegram: $telegramQueued queued, $whatsAppNeeded need WhatsApp" +
+                    if (failed > 0) ", $failed failed" else "",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    /** Bulk confirm for entries that the operator sent manually via WhatsApp. */
+    fun markAllSent(context: Context, items: List<CollectionItem>) {
+        if (items.isEmpty()) return
+        viewModelScope.launch {
+            var done = 0
+            for (item in items) {
+                runCatching { collectionRepo.confirmSentSafely(item.id) }.onSuccess { done++ }
+            }
+            CashCollectWidgetProvider.notifyDataChanged(context)
+            Toast.makeText(
+                context,
+                "$done entr${if (done == 1) "y" else "ies"} confirmed",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    /** Retries the Telegram dispatch for an entry whose previous send failed. */
+    fun retryTelegram(context: Context, item: CollectionItem) {
+        viewModelScope.launch {
+            val settings = settingsRepo.getSettingsSync()
+            if (!settings.telegramEnabled || !telegramManager.isReady()) {
+                Toast.makeText(context, "Telegram is not online right now", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val res = telegramManager.sendCollectionReceipt(
+                collection = item,
+                recipient = settings.telegramRecipient,
+                template = settings.messageTemplate
+            )
+            if (res.isSuccess) {
+                collectionRepo.markDispatchFailed(item.id, "")
+                Toast.makeText(context, "Retrying Telegram send", Toast.LENGTH_SHORT).show()
+            } else {
+                val reason = res.exceptionOrNull()?.message ?: "Telegram send failed"
+                collectionRepo.markDispatchFailed(item.id, reason)
+                Toast.makeText(context, "Still failing: $reason", Toast.LENGTH_LONG).show()
+            }
+            CashCollectWidgetProvider.notifyDataChanged(context)
+        }
+    }
+
+    /**
+     * Swipe-left action: instant void — no dialog, no undo. The entry is preserved as VOIDED
+     * (never hard-deleted) so the audit trail and the totals stay correct.
+     */
+    fun voidInstantly(context: Context, item: CollectionItem) {
+        viewModelScope.launch {
+            runCatching { collectionRepo.voidCollection(item.id, VOID_REASON_QUICK) }
+                .onFailure {
+                    Toast.makeText(context, "Could not void: ${it.message}", Toast.LENGTH_LONG).show()
+                }
+                .onSuccess {
+                    CashCollectWidgetProvider.notifyDataChanged(context)
+                    Toast.makeText(context, "Voided ${item.customerDisplayName}", Toast.LENGTH_SHORT).show()
+                }
+        }
+    }
+
     private suspend fun openWhatsAppInternal(context: Context, item: CollectionItem, settings: com.jayesh.cashcollect.domain.model.AppSettings) {
+        if (settings.brotherWhatsAppNumber.isBlank()) {
+            Toast.makeText(
+                context,
+                "Set the WhatsApp recipient number in Settings first.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
         val msg = WhatsAppLauncher.buildReceiptMessage(item, settings.messageTemplate)
         val intent = WhatsAppLauncher.createSendIntent(context, settings.brotherWhatsAppNumber, msg)
         collectionRepo.logWhatsAppOpened(item.id)

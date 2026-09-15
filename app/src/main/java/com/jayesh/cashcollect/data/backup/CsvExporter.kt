@@ -21,14 +21,16 @@ class CsvExporter(private val context: Context) {
 
         csvFile.bufferedWriter().use { writer ->
             // Header
-            writer.write("ID,Customer Name,Customer Alias,Amount (Rupees),Commission (Rupees),Rate (per 1000),Status,Created At,Received At,Confirmed At,Void Reason\n")
+            writer.write("ID,Customer Name,Customer Alias,Amount (Rupees),Commission (Rupees),Rate (per 1000),Status,Created At,Received At,Confirmed At,Void Reason,Note\n")
 
             for (item in items) {
                 val createdStr = dateFormat.format(Date(item.createdAt))
                 val receivedStr = item.receivedAt?.let { dateFormat.format(Date(it)) } ?: ""
                 val confirmedStr = item.confirmedSentAt?.let { dateFormat.format(Date(it)) } ?: ""
-                val amountRupees = Paise(item.amountPaise).toFormattedRupees(includeSymbol = false)
-                val commissionRupees = Paise(item.commissionPaise).toFormattedRupees(includeSymbol = false)
+                // Raw integers only: formatted values contain thousands separators (4,00,000),
+                // which would shift every column in the CSV.
+                val amountRupees = item.amountPaise / 100L
+                val commissionRupees = item.commissionPaise / 100L
 
                 val line = buildString {
                     append(item.id).append(",")
@@ -41,7 +43,8 @@ class CsvExporter(private val context: Context) {
                     append(createdStr).append(",")
                     append(receivedStr).append(",")
                     append(confirmedStr).append(",")
-                    append(escapeCsv(item.voidReason.orEmpty()))
+                    append(escapeCsv(item.voidReason.orEmpty())).append(",")
+                    append(escapeCsv(item.note.orEmpty()))
                     append("\n")
                 }
                 writer.write(line)

@@ -403,7 +403,7 @@ class TelegramManager(private val context: Context) {
      * Step 1 of login: submit the phone number. Telegram then sends a login code (usually to the
      * Telegram app itself, sometimes by SMS).
      */
-    fun requestLogin(phoneNumber: String, isCurrentPhoneNumber: Boolean = false) {
+    fun requestLogin(phoneNumber: String) {
         val normalized = normalizePhoneNumber(phoneNumber)
         if (normalized.length < 8) {
             _authState.value = TelegramAuthState.Error(
@@ -417,7 +417,6 @@ class TelegramManager(private val context: Context) {
             val settings = TdApi.PhoneNumberAuthenticationSettings().apply {
                 allowFlashCall = false
                 allowMissedCall = false
-                isCurrentPhoneNumber = isCurrentPhoneNumber
                 hasUnknownPhoneNumber = false
                 allowSmsRetrieverApi = false
                 firebaseAuthenticationSettings = TdApi.FirebaseAuthenticationSettingsAndroid()

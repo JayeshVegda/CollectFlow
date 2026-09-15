@@ -42,7 +42,7 @@ object MessageTemplateEngine {
             "date" to dateStr,
             "time" to timeStr,
             "ref" to collection.id.toString(),
-            "note" to (collection.voidReason ?: "") // Note or details
+            "note" to (collection.note ?: "") // {note} must render the entry note, never the void reason
         )
 
         for ((key, value) in replacements) {

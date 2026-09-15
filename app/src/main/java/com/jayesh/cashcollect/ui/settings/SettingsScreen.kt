@@ -863,6 +863,7 @@ fun SettingsScreen(
             }
         )
     }
+}
 
 @Composable
 private fun TelegramSignInDialog(
@@ -1055,5 +1056,4 @@ private fun TelegramInputField(
             unfocusedTextColor = NothingWhite
         )
     )
-}
 }
