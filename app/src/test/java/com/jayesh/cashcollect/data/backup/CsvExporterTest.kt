@@ -56,15 +56,17 @@ class CsvExporterTest {
             listOf(item(note = "Half cash, half UPI", voidReason = null)),
             dateFormat
         )
-        // "Half cash, half UPI" contains a comma, so it must be quoted as one field.
-        assertTrue(rows[0].endsWith(",\"Half cash, half UPI\""))
-        assertEquals(12, rows[0].split(",").dropLast(1).size + 1) // 12 fields after quote-aware split
+        val fields = splitCsvLine(rows[0])
+        assertEquals(12, fields.size)
+        // "Half cash, half UPI" contains a comma, so it must stay one quoted field.
+        assertEquals("Half cash, half UPI", fields[11])
     }
 
     @Test
     fun `void reason goes into its own column`() {
         val rows = buildCsvRows(listOf(item(voidReason = "CHEQUE DISHONOURED")), dateFormat)
-        assertTrue(rows[0].contains(",CHEQUE DISHONOURED,"))
+        val fields = splitCsvLine(rows[0])
+        assertEquals("CHEQUE DISHONOURED", fields[10])
     }
 
     @Test
@@ -73,12 +75,42 @@ class CsvExporterTest {
         assertEquals("plain", escapeCsvValue("plain"))
     }
 
+    /** RFC-4180 style quote-aware splitter for verifying produced rows. */
+    private fun splitCsvLine(line: String): List<String> {
+        val fields = mutableListOf<String>()
+        val current = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                c == '"' -> {
+                    if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
+                        current.append('"')
+                        i++
+                    } else {
+                        inQuotes = !inQuotes
+                    }
+                }
+                c == ',' && !inQuotes -> {
+                    fields.add(current.toString())
+                    current.setLength(0)
+                }
+                else -> current.append(c)
+            }
+            i++
+        }
+        fields.add(current.toString())
+        return fields
+    }
+
     @Test
     fun `missing optional timestamps are empty cells`() {
         val rows = buildCsvRows(listOf(item()), dateFormat)
-        val cells = rows[0].split(",")
-        assertEquals("", cells[8]) // received_at
-        assertEquals("", cells[9]) // confirmed_at
-        assertEquals("1970-01-01 00:00:00", cells[7]) // created_at
+        val fields = splitCsvLine(rows[0])
+        assertEquals(12, fields.size)
+        assertEquals("", fields[8]) // received_at
+        assertEquals("", fields[9]) // confirmed_at
+        assertEquals("1970-01-01 00:00:00", fields[7]) // created_at
     }
 }
