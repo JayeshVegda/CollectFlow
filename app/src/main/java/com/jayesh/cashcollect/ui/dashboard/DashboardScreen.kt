@@ -92,9 +92,15 @@ fun DashboardScreen(
         t >= startOfToday
     }
 
-    val todayTotalPaise = todayItems.sumOf { it.amountPaise }
-    val todayCommPaise = todayItems.sumOf { it.commissionPaise }
-    val todayCount = todayItems.size
+    // "Collected" means money actually in hand: RECEIPT_CONFIRMED or CONFIRMED only.
+    // PENDING entries are promises, not cash — including them inflated the collected total.
+    val todayCollectedItems = todayItems.filter {
+        it.status == CollectionStatus.RECEIPT_CONFIRMED || it.status == CollectionStatus.CONFIRMED
+    }
+
+    val todayTotalPaise = todayCollectedItems.sumOf { it.amountPaise }
+    val todayCommPaise = todayCollectedItems.sumOf { it.commissionPaise }
+    val todayCount = todayCollectedItems.size
 
     val outstandingCount = validItems.count { it.status == CollectionStatus.RECEIPT_CONFIRMED }
     val pendingCount = validItems.count { it.status == CollectionStatus.PENDING }

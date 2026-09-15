@@ -52,9 +52,12 @@ class CashCollectTrackerWidgetProvider : AppWidgetProvider() {
                 val startOfToday = cal.timeInMillis
 
                 val validItems = allCollections.filter { it.status != CollectionStatus.VOIDED.name }
+                // Collected cash only: RECEIPT_CONFIRMED or CONFIRMED. PENDING entries are
+                // promises, not money in hand — counting them inflated the widget total.
                 val todayItems = validItems.filter {
-                    val t = it.receivedAt ?: it.createdAt
-                    t >= startOfToday
+                    (it.status == CollectionStatus.RECEIPT_CONFIRMED.name ||
+                        it.status == CollectionStatus.CONFIRMED.name) &&
+                        (it.receivedAt ?: it.createdAt) >= startOfToday
                 }
 
                 val todayTotalPaise = todayItems.sumOf { it.amountPaise }
