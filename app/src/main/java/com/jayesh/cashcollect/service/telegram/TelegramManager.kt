@@ -7,6 +7,7 @@ import android.util.Log
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.service.whatsapp.WhatsAppLauncher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -115,6 +116,9 @@ class TelegramManager(private val context: Context) {
         get() = File(context.filesDir, "tdlib_files").apply { if (!exists()) mkdirs() }
 
     private fun appendDiagnostic(line: String) {
+        // Also mirror into logcat. The in-memory buffer is only visible inside the app, which made
+        // every TDLib failure invisible during on-device debugging.
+        Log.println(if (line.startsWith("[E]")) Log.ERROR else Log.DEBUG, TAG, line)
         val current = _diagnostics.value
         _diagnostics.value = if (current.size >= MAX_DIAGNOSTIC_LINES) {
             current.drop(current.size - MAX_DIAGNOSTIC_LINES + 1) + line
@@ -175,8 +179,17 @@ class TelegramManager(private val context: Context) {
         scope.launch {
             if (!collectorsStarted) {
                 collectorsStarted = true
-                launch { tdClient.updates.collect { handleUpdate(it) } }
-                launch { tdClient.logLines.collect { appendDiagnostic(it) } }
+                // UNDISPATCHED: run each collector synchronously until it suspends on the flow
+                // subscription. A plain launch() only *schedules* the body, so tdClient.start()
+                // below could create the native client and let TDLib emit its first
+                // UpdateAuthorizationState before anything was subscribed — the update was then
+                // dropped and the login flow hung on CONNECTING forever.
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    tdClient.updates.collect { handleUpdate(it) }
+                }
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    tdClient.logLines.collect { appendDiagnostic(it) }
+                }
             }
             try {
                 removeLegacyUnencryptedDatabase()
