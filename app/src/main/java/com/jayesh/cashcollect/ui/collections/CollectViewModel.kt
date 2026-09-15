@@ -272,9 +272,12 @@ class CollectViewModel(
 
     fun confirmSent(context: Context, id: Long) {
         viewModelScope.launch {
-            collectionRepo.confirmSent(id)
+            runCatching { collectionRepo.confirmSentSafely(id) }
+                .onFailure {
+                    Toast.makeText(context, "Could not confirm: ${it.message}", Toast.LENGTH_LONG).show()
+                }
             CashCollectWidgetProvider.notifyDataChanged(context)
-            Toast.makeText(context, "Confirmed Sent", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Confirmed sent", Toast.LENGTH_SHORT).show()
         }
     }
 
