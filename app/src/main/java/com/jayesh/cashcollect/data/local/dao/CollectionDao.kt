@@ -103,6 +103,9 @@ interface CollectionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(collections: List<CollectionEntity>)
 
+    @Query("DELETE FROM collections WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("DELETE FROM collections")
     suspend fun deleteAll()
 }

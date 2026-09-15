@@ -24,7 +24,8 @@ class CollectViewModel(
     private val collectionRepo: CollectionRepository,
     private val customerRepo: CustomerRepository,
     private val settingsRepo: SettingsRepository,
-    private val notificationManager: AppNotificationManager
+    private val notificationManager: AppNotificationManager,
+    private val telegramManager: com.jayesh.cashcollect.service.telegram.TelegramManager
 ) : ViewModel() {
 
     val outstandingList: StateFlow<List<CollectionItem>> = collectionRepo.getOutstandingConfirmations()
@@ -43,6 +44,9 @@ class CollectViewModel(
     private val _selectedItemForConfirm = MutableStateFlow<CollectionItem?>(null)
     val selectedItemForConfirm: StateFlow<CollectionItem?> = _selectedItemForConfirm.asStateFlow()
 
+    private val _selectedItemForEdit = MutableStateFlow<CollectionItem?>(null)
+    val selectedItemForEdit: StateFlow<CollectionItem?> = _selectedItemForEdit.asStateFlow()
+
     fun openQuickCapture() {
         _isQuickCaptureOpen.value = true
     }
@@ -57,6 +61,14 @@ class CollectViewModel(
 
     fun dismissConfirm() {
         _selectedItemForConfirm.value = null
+    }
+
+    fun openEdit(item: CollectionItem) {
+        _selectedItemForEdit.value = item
+    }
+
+    fun dismissEdit() {
+        _selectedItemForEdit.value = null
     }
 
     fun saveQuickCapture(context: Context, name: String, amountPaise: Long, note: String?) {
@@ -74,7 +86,7 @@ class CollectViewModel(
         }
     }
 
-    fun confirmReceiveAndOpenWhatsApp(context: Context, item: CollectionItem) {
+    fun confirmReceive(context: Context, item: CollectionItem) {
         viewModelScope.launch {
             dismissConfirm()
             val committed = collectionRepo.markReceivedAndCommit(item.id)
@@ -82,15 +94,40 @@ class CollectViewModel(
             notificationManager.showImmediateReceiptNotification(committed)
 
             val settings = settingsRepo.getSettingsSync()
-            val msg = WhatsAppLauncher.buildReceiptMessage(committed, settings.messageTemplate)
-            val intent = WhatsAppLauncher.createSendIntent(context, settings.brotherWhatsAppNumber, msg)
-            collectionRepo.logWhatsAppOpened(item.id)
-
-            try {
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Could not open WhatsApp. Receipt is saved.", Toast.LENGTH_LONG).show()
+            if (settings.telegramEnabled && telegramManager.isReady()) {
+                val res = telegramManager.sendCollectionReceipt(
+                    collection = committed,
+                    recipient = settings.telegramRecipient,
+                    template = settings.messageTemplate
+                )
+                if (res.isSuccess) {
+                    Toast.makeText(context, "Telegram auto-send queued ⚡", Toast.LENGTH_SHORT).show()
+                    return@launch
+                } else {
+                    if (!settings.telegramFallbackWhatsApp) {
+                        Toast.makeText(context, "Telegram error: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                        return@launch
+                    }
+                }
             }
+
+            // Fallback to WhatsApp
+            openWhatsAppInternal(context, committed, settings)
+        }
+    }
+
+    fun confirmReceiveAndOpenWhatsApp(context: Context, item: CollectionItem) {
+        confirmReceive(context, item)
+    }
+
+    private suspend fun openWhatsAppInternal(context: Context, item: CollectionItem, settings: com.jayesh.cashcollect.domain.model.AppSettings) {
+        val msg = WhatsAppLauncher.buildReceiptMessage(item, settings.messageTemplate)
+        val intent = WhatsAppLauncher.createSendIntent(context, settings.brotherWhatsAppNumber, msg)
+        collectionRepo.logWhatsAppOpened(item.id)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Could not open WhatsApp. Receipt is saved.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -116,6 +153,22 @@ class CollectViewModel(
         }
     }
 
+    fun deleteCollection(context: Context, id: Long) {
+        viewModelScope.launch {
+            collectionRepo.deleteCollection(id)
+            CashCollectWidgetProvider.notifyDataChanged(context)
+            Toast.makeText(context, "Entry deleted", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun updateCollection(context: Context, id: Long, amountPaise: Long, note: String?) {
+        viewModelScope.launch {
+            collectionRepo.updateCollection(id, amountPaise, note)
+            CashCollectWidgetProvider.notifyDataChanged(context)
+            Toast.makeText(context, "Entry updated", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun voidAndReplace(
         context: Context,
         originalId: Long,
@@ -137,11 +190,12 @@ class CollectViewModel(
         private val collectionRepo: CollectionRepository,
         private val customerRepo: CustomerRepository,
         private val settingsRepo: SettingsRepository,
-        private val notificationManager: AppNotificationManager
+        private val notificationManager: AppNotificationManager,
+        private val telegramManager: com.jayesh.cashcollect.service.telegram.TelegramManager
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return CollectViewModel(collectionRepo, customerRepo, settingsRepo, notificationManager) as T
+            return CollectViewModel(collectionRepo, customerRepo, settingsRepo, notificationManager, telegramManager) as T
         }
     }
 }

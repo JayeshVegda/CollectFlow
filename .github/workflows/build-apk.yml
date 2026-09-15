@@ -30,6 +30,19 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Ensure TDLib AARs
+        run: |
+          mkdir -p app/libs
+          if [ ! -f app/libs/core-release.aar ]; then
+            echo "Downloading core-release.aar..."
+            curl -L -s https://github.com/AkashPriyadarshii/tdlib-android/releases/download/v0.1.1/core-release.aar -o app/libs/core-release.aar
+          fi
+          if [ ! -f app/libs/ktx-release.aar ]; then
+            echo "Downloading ktx-release.aar..."
+            curl -L -s https://github.com/AkashPriyadarshii/tdlib-android/releases/download/v0.1.1/ktx-release.aar -o app/libs/ktx-release.aar
+          fi
+          ls -lh app/libs/
+
       - name: Run Unit Tests
         run: |
           set -o pipefail

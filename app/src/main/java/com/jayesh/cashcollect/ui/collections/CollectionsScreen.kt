@@ -77,6 +77,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import com.jayesh.cashcollect.ui.common.EditCollectionBottomSheet
+
 @Composable
 fun CollectRoute(
     viewModel: CollectViewModel,
@@ -100,9 +109,11 @@ fun CollectRoute(
         onAddCollectionClick = onAddCollectionClick,
         onQuickCaptureSave = { name, amt, note -> viewModel.saveQuickCapture(context, name, amt, note) },
         onCollectionClick = onCollectionClick,
-        onReceiveAndWhatsApp = { item -> viewModel.confirmReceiveAndOpenWhatsApp(context, item) },
+        onReceiveAndWhatsApp = { item -> viewModel.confirmReceive(context, item) },
         onOpenWhatsAppAgain = { item -> viewModel.openWhatsAppAgain(context, item) },
         onConfirmSent = { id -> viewModel.confirmSent(context, id) },
+        onDeleteCollection = { id -> viewModel.deleteCollection(context, id) },
+        onUpdateCollection = { id, amt, note -> viewModel.updateCollection(context, id, amt, note) },
         onSettingsClick = onSettingsClick
     )
 }
@@ -121,6 +132,8 @@ fun CollectionsScreen(
     onReceiveAndWhatsApp: (CollectionItem) -> Unit,
     onOpenWhatsAppAgain: (CollectionItem) -> Unit,
     onConfirmSent: (Long) -> Unit,
+    onDeleteCollection: (Long) -> Unit,
+    onUpdateCollection: (Long, Long, String?) -> Unit,
     onSettingsClick: () -> Unit
 ) {
     var isQuickCaptureOpen by remember { mutableStateOf(initialOpenQuickCapture) }
@@ -134,6 +147,12 @@ fun CollectionsScreen(
 
     var selectedItemForConfirm by remember { mutableStateOf<CollectionItem?>(null) }
     val confirmSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var itemToEdit by remember { mutableStateOf<CollectionItem?>(null) }
+    val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var itemToDelete by remember { mutableStateOf<CollectionItem?>(null) }
+
     val scope = rememberCoroutineScope()
 
     // BackHandler ensures pressing Back closes sheets cleanly without exiting or triggering navigation loops
@@ -144,6 +163,10 @@ fun CollectionsScreen(
 
     BackHandler(enabled = selectedItemForConfirm != null) {
         selectedItemForConfirm = null
+    }
+
+    BackHandler(enabled = itemToEdit != null) {
+        itemToEdit = null
     }
 
     Scaffold(
@@ -168,29 +191,6 @@ fun CollectionsScreen(
                             fontSize = 17.sp,
                             color = NothingWhite
                         )
-                    }
-                },
-                actions = {
-                    // Quick Action pill in top bar
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .border(1.dp, NothingBorderVisible, RoundedCornerShape(999.dp))
-                            .clickable { isQuickCaptureOpen = true }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "+ QUICK",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp,
-                            color = NothingWhite
-                        )
-                    }
-
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = NothingGray)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -287,10 +287,12 @@ fun CollectionsScreen(
                 }
             } else {
                 items(pendingList, key = { it.id }) { item ->
-                    PendingRow(
+                    SwipeablePendingRow(
                         item = item,
                         onClick = { onCollectionClick(item.id) },
-                        onReceiveClick = { selectedItemForConfirm = item }
+                        onReceiveClick = { selectedItemForConfirm = item },
+                        onEditClick = { itemToEdit = item },
+                        onDeleteClick = { itemToDelete = item }
                     )
                 }
             }
@@ -319,7 +321,7 @@ fun CollectionsScreen(
         )
     }
 
-    // Confirmation Bottom Sheet before committing & launching WhatsApp
+    // Confirmation Bottom Sheet before committing & launching WhatsApp / Telegram
     selectedItemForConfirm?.let { item ->
         ConfirmBottomSheet(
             collection = item,
@@ -334,6 +336,75 @@ fun CollectionsScreen(
                     val target = selectedItemForConfirm
                     selectedItemForConfirm = null
                     target?.let { onReceiveAndWhatsApp(it) }
+                }
+            }
+        )
+    }
+
+    // Edit Bottom Sheet
+    itemToEdit?.let { item ->
+        EditCollectionBottomSheet(
+            collection = item,
+            sheetState = editSheetState,
+            onDismiss = {
+                scope.launch { editSheetState.hide() }.invokeOnCompletion {
+                    itemToEdit = null
+                }
+            },
+            onSave = { amountPaise, note ->
+                scope.launch { editSheetState.hide() }.invokeOnCompletion {
+                    val id = item.id
+                    itemToEdit = null
+                    onUpdateCollection(id, amountPaise, note)
+                }
+            },
+            onDelete = {
+                scope.launch { editSheetState.hide() }.invokeOnCompletion {
+                    val id = item.id
+                    itemToEdit = null
+                    onDeleteCollection(id)
+                }
+            }
+        )
+    }
+
+    // Delete Confirmation Dialog
+    itemToDelete?.let { item ->
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            containerColor = NothingCardRaised,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
+            title = {
+                Text(
+                    text = "DELETE ENTRY?",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = NothingWhite
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete collection of ${Paise(item.amountPaise).toFormattedRupees()} for ${item.customerDisplayName}?",
+                    color = NothingGray
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val id = item.id
+                        itemToDelete = null
+                        onDeleteCollection(id)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NothingRed),
+                    shape = RoundedCornerShape(999.dp)
+                ) {
+                    Text("DELETE", color = NothingWhite, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToDelete = null }) {
+                    Text("CANCEL", color = NothingGray, fontFamily = FontFamily.Monospace)
                 }
             }
         )
@@ -448,11 +519,98 @@ private fun OutstandingRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeablePendingRow(
+    item: CollectionItem,
+    onClick: () -> Unit,
+    onReceiveClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    onReceiveClick()
+                    false
+                }
+                SwipeToDismissBoxValue.EndToStart -> {
+                    onDeleteClick()
+                    false
+                }
+                SwipeToDismissBoxValue.Settled -> false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            val direction = dismissState.dismissDirection
+            val color = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> NothingGreen
+                SwipeToDismissBoxValue.EndToStart -> NothingRed
+                SwipeToDismissBoxValue.Settled -> Color.Transparent
+            }
+            val alignment = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                SwipeToDismissBoxValue.Settled -> Alignment.Center
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(color)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = alignment
+            ) {
+                if (direction == SwipeToDismissBoxValue.StartToEnd) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "RECEIVE & SEND",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = Color.Black
+                        )
+                    }
+                } else if (direction == SwipeToDismissBoxValue.EndToStart) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "DELETE / VOID",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = NothingWhite
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = NothingWhite)
+                    }
+                }
+            }
+        }
+    ) {
+        PendingRow(
+            item = item,
+            onClick = onClick,
+            onReceiveClick = onReceiveClick,
+            onEditClick = onEditClick
+        )
+    }
+}
+
 @Composable
 private fun PendingRow(
     item: CollectionItem,
     onClick: () -> Unit,
-    onReceiveClick: () -> Unit
+    onReceiveClick: () -> Unit,
+    onEditClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -500,23 +658,40 @@ private fun PendingRow(
                 }
             }
 
-            Button(
-                onClick = onReceiveClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = NothingWhite,
-                    contentColor = Color.Black
-                ),
-                shape = RoundedCornerShape(999.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "RECEIVE",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    letterSpacing = 0.5.sp,
-                    color = Color.Black
-                )
+                IconButton(
+                    onClick = onEditClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Edit",
+                        tint = NothingGray,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Button(
+                    onClick = onReceiveClick,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NothingWhite,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(999.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "RECEIVE",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp,
+                        color = Color.Black
+                    )
+                }
             }
         }
     }

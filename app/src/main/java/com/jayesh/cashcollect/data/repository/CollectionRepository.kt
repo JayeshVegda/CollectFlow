@@ -214,4 +214,23 @@ class CollectionRepository(
             collectionDao.update(voided)
         }
     }
+
+    suspend fun deleteCollection(id: Long) {
+        collectionDao.deleteById(id)
+    }
+
+    suspend fun updateCollection(id: Long, amountPaise: Long, note: String?) {
+        val existing = collectionDao.getById(id) ?: return
+        val commPaise = com.jayesh.cashcollect.domain.money.CommissionCalculator.calculate(
+            amountPaise,
+            existing.commissionRateSnapshot
+        )
+        collectionDao.update(
+            existing.copy(
+                amountPaise = amountPaise,
+                commissionPaise = commPaise,
+                note = note
+            )
+        )
+    }
 }

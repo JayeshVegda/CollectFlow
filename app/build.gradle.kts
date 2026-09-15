@@ -19,6 +19,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     buildTypes {
@@ -90,6 +93,13 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     compileOnly("com.google.errorprone:error_prone_annotations:2.20.0")
     compileOnly("com.google.code.findbugs:jsr305:3.0.2")
+
+    // TDLib native prebuilt binary (arm64-v8a, Android 15 16KB-page-size aligned) & Kotlin Coroutines wrapper
+    implementation(files("libs/core-release.aar"))
+    implementation(files("libs/ktx-release.aar"))
+
+    // Pure-Java QR code generator for Telegram QR login display in Compose
+    implementation("com.google.zxing:core:3.5.3")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

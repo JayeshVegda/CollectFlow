@@ -17,3 +17,5 @@ app/build/
 *.hprof
 .idea/
 *.tar.gz
+app/libs/*.aar
+build-output/

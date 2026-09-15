@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
         CollectionEntity::class,
         SettingsEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -45,6 +45,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE settings ADD COLUMN telegram_enabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE settings ADD COLUMN telegram_api_id TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE settings ADD COLUMN telegram_api_hash TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE settings ADD COLUMN telegram_recipient TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE settings ADD COLUMN telegram_fallback_whatsapp INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: buildDatabase(context.applicationContext).also { INSTANCE = it }
@@ -57,7 +67,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 DATABASE_NAME
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {

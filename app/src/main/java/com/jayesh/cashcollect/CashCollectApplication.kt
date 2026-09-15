@@ -19,6 +19,7 @@ class CashCollectApplication : Application() {
     lateinit var notificationManager: AppNotificationManager private set
     lateinit var backupManager: EncryptedBackupManager private set
     lateinit var csvExporter: CsvExporter private set
+    lateinit var telegramManager: com.jayesh.cashcollect.service.telegram.TelegramManager private set
 
     override fun onCreate() {
         super.onCreate()
@@ -31,6 +32,24 @@ class CashCollectApplication : Application() {
         notificationManager = AppNotificationManager(this)
         backupManager = EncryptedBackupManager(this, database)
         csvExporter = CsvExporter(this)
+        telegramManager = com.jayesh.cashcollect.service.telegram.TelegramManager(this)
+
+        // Listen for TDLib message delivery confirmation to mark Room record CONFIRMED
+        telegramManager.onMessageSendSucceeded = { collectionId ->
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                collectionRepository.confirmSent(collectionId)
+                com.jayesh.cashcollect.widget.CashCollectWidgetProvider.notifyDataChanged(this@CashCollectApplication)
+            }
+        }
+
+        // Auto-connect Telegram if enabled and configured
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val s = settingsRepository.getSettingsSync()
+            val apiId = s.telegramApiId.toIntOrNull() ?: 0
+            if (s.telegramEnabled && apiId > 0 && s.telegramApiHash.isNotBlank()) {
+                telegramManager.start(apiId, s.telegramApiHash)
+            }
+        }
 
         // Schedule periodic reminder check for unconfirmed collections safely
         try {

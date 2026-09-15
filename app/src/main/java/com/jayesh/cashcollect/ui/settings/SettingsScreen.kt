@@ -76,6 +76,20 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import com.jayesh.cashcollect.service.telegram.TelegramAuthState
+import com.jayesh.cashcollect.ui.theme.NothingGreen
+
 @Composable
 fun SettingsRoute(
     viewModel: SettingsViewModel,
@@ -83,13 +97,23 @@ fun SettingsRoute(
     onRestoreBackupClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val telegramAuthState by viewModel.telegramAuthState.collectAsStateWithLifecycle()
 
     SettingsScreen(
         settings = settings,
+        telegramAuthState = telegramAuthState,
         onSaveNumber = viewModel::saveBrotherNumber,
         onSaveTemplate = viewModel::saveMessageTemplate,
         onSaveRate = viewModel::saveCommissionRate,
+        onSaveTelegram = { enabled, id, hash, recipient, fallback ->
+            viewModel.saveTelegramSettings(enabled, id, hash, recipient, fallback)
+        },
+        onConnectTelegram = viewModel::connectTelegram,
+        onCheckPassword = viewModel::checkTelegramPassword,
+        onLogoutTelegram = viewModel::logoutTelegram,
+        onTestSendTelegram = { viewModel.testSendTelegram(context) },
         onBackupNow = onBackupNow,
         onRestoreBackupClick = onRestoreBackupClick,
         onBackClick = onBackClick
@@ -100,9 +124,15 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
+    telegramAuthState: TelegramAuthState = TelegramAuthState.LoggedOut,
     onSaveNumber: (String) -> Unit,
     onSaveTemplate: (String) -> Unit,
     onSaveRate: (Int) -> Unit,
+    onSaveTelegram: (enabled: Boolean, apiId: String, apiHash: String, recipient: String, fallbackWhatsApp: Boolean) -> Unit = { _, _, _, _, _ -> },
+    onConnectTelegram: () -> Unit = {},
+    onCheckPassword: (String) -> Unit = {},
+    onLogoutTelegram: () -> Unit = {},
+    onTestSendTelegram: () -> Unit = {},
     onBackupNow: () -> Unit,
     onRestoreBackupClick: () -> Unit,
     onBackClick: () -> Unit
@@ -116,6 +146,14 @@ fun SettingsScreen(
     var commissionRateText by remember(settings.commissionRatePerThousand) {
         mutableStateOf(settings.commissionRatePerThousand.toString())
     }
+
+    var tgEnabled by remember(settings.telegramEnabled) { mutableStateOf(settings.telegramEnabled) }
+    var tgApiId by remember(settings.telegramApiId) { mutableStateOf(settings.telegramApiId) }
+    var tgApiHash by remember(settings.telegramApiHash) { mutableStateOf(settings.telegramApiHash) }
+    var tgRecipient by remember(settings.telegramRecipient) { mutableStateOf(settings.telegramRecipient) }
+    var tgFallback by remember(settings.telegramFallbackWhatsApp) { mutableStateOf(settings.telegramFallbackWhatsApp) }
+    var hashVisible by remember { mutableStateOf(false) }
+
     var showSavedMessage by remember { mutableStateOf(false) }
 
     val previewMessage = remember(messageTemplate) {
@@ -210,6 +248,230 @@ fun SettingsScreen(
                         Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("SAVE NUMBER", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
+                    }
+                }
+            }
+
+            // TELEGRAM DISPATCH (TDLIB)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, NothingBorder, RoundedCornerShape(14.dp)),
+                colors = CardDefaults.cardColors(containerColor = NothingCard),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "TELEGRAM AUTO-SEND (TDLIB)",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            letterSpacing = 1.sp,
+                            color = NothingWhite
+                        )
+
+                        // Status pill
+                        val (statusText, statusBg, statusFg) = when (telegramAuthState) {
+                            is TelegramAuthState.Ready -> Triple("ONLINE", NothingGreen.copy(alpha = 0.2f), NothingGreen)
+                            is TelegramAuthState.WaitingForQrCode, is TelegramAuthState.ShowingQr -> Triple("SCAN QR", NothingAmber.copy(alpha = 0.2f), NothingAmber)
+                            is TelegramAuthState.WaitingForPassword -> Triple("2FA REQ", NothingAmber.copy(alpha = 0.2f), NothingAmber)
+                            is TelegramAuthState.Error -> Triple("ERROR", NothingRed.copy(alpha = 0.2f), NothingRed)
+                            is TelegramAuthState.LoggedOut -> Triple("OFFLINE", NothingCardRaised, NothingGray)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(statusBg)
+                                .border(1.dp, statusFg.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = statusText,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                color = statusFg
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "1-click automatic background dispatch from your personal Telegram account without opening the Telegram UI.",
+                        fontSize = 12.sp,
+                        color = NothingGray,
+                        lineHeight = 16.sp
+                    )
+
+                    // Switches
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Enable Telegram Send", fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = NothingWhite)
+                            Text("Auto-dispatch receipt via personal account", fontSize = 11.sp, color = NothingMuted)
+                        }
+                        Switch(
+                            checked = tgEnabled,
+                            onCheckedChange = { tgEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = NothingWhite,
+                                checkedTrackColor = NothingGreen,
+                                uncheckedThumbColor = NothingGray,
+                                uncheckedTrackColor = NothingBlack
+                            )
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Fallback to WhatsApp", fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = NothingWhite)
+                            Text("Open WhatsApp if Telegram fails or is offline", fontSize = 11.sp, color = NothingMuted)
+                        }
+                        Switch(
+                            checked = tgFallback,
+                            onCheckedChange = { tgFallback = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = NothingWhite,
+                                checkedTrackColor = NothingGreen,
+                                uncheckedThumbColor = NothingGray,
+                                uncheckedTrackColor = NothingBlack
+                            )
+                        )
+                    }
+
+                    // API ID
+                    Text(
+                        text = "API ID (from my.telegram.org):",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = NothingGray
+                    )
+                    OutlinedTextField(
+                        value = tgApiId,
+                        onValueChange = { tgApiId = it },
+                        placeholder = { Text("e.g. 12345678", color = NothingMuted) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingWhite,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
+                    )
+
+                    // API Hash
+                    Text(
+                        text = "API HASH (from my.telegram.org):",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = NothingGray
+                    )
+                    OutlinedTextField(
+                        value = tgApiHash,
+                        onValueChange = { tgApiHash = it },
+                        placeholder = { Text("32-character hex hash", color = NothingMuted) },
+                        visualTransformation = if (hashVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { hashVisible = !hashVisible }) {
+                                Icon(
+                                    if (hashVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = null,
+                                    tint = NothingGray
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingWhite,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
+                    )
+
+                    // Recipient
+                    Text(
+                        text = "RECIPIENT (Username @brother or phone number):",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = NothingGray
+                    )
+                    OutlinedTextField(
+                        value = tgRecipient,
+                        onValueChange = { tgRecipient = it },
+                        placeholder = { Text("@brother or +91...", color = NothingMuted) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingWhite,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
+                    )
+
+                    // Action buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                onSaveTelegram(tgEnabled, tgApiId, tgApiHash, tgRecipient, tgFallback)
+                                showSavedMessage = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = NothingWhite),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("SAVE CONFIG", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
+                        }
+
+                        if (telegramAuthState !is TelegramAuthState.Ready) {
+                            OutlinedButton(
+                                onClick = onConnectTelegram,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.QrCode, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("SCAN QR", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = onTestSendTelegram,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Send, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("TEST SEND", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
+                            }
+                        }
+                    }
+
+                    if (telegramAuthState is TelegramAuthState.Ready) {
+                        TextButton(
+                            onClick = onLogoutTelegram,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Text("LOGOUT FROM TELEGRAM", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = NothingRed)
+                        }
                     }
                 }
             }
@@ -476,6 +738,114 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showSavedMessage = false }) {
                     Text("OK", color = NothingRed, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    // Telegram QR Dialog
+    if (telegramAuthState is TelegramAuthState.ShowingQr) {
+        val qrState = telegramAuthState as TelegramAuthState.ShowingQr
+        AlertDialog(
+            onDismissRequest = onLogoutTelegram,
+            containerColor = NothingBlack,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
+            title = {
+                Text(
+                    text = "LINK PERSONAL TELEGRAM",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = NothingWhite
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(240.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White)
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            bitmap = qrState.qrBitmap,
+                            contentDescription = "Telegram QR Code",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    Text(
+                        text = "1. Open Telegram on your phone\n2. Go to Settings → Devices\n3. Tap 'Link Desktop Device'\n4. Scan this QR Code",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        color = NothingGray,
+                        lineHeight = 18.sp
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onLogoutTelegram) {
+                    Text("CANCEL", color = NothingRed, fontFamily = FontFamily.Monospace)
+                }
+            }
+        )
+    }
+
+    // Telegram 2FA Password Dialog
+    if (telegramAuthState is TelegramAuthState.WaitingForPassword) {
+        var passwordInput by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = onLogoutTelegram,
+            containerColor = NothingCardRaised,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
+            title = {
+                Text(
+                    text = "ENTER 2FA PASSWORD",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = NothingWhite
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Your Telegram account is protected by 2-Step Verification. Enter your cloud password to complete login:",
+                        fontSize = 12.sp,
+                        color = NothingGray
+                    )
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { passwordInput = it },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NothingWhite,
+                            unfocusedBorderColor = NothingBorder,
+                            focusedTextColor = NothingWhite,
+                            unfocusedTextColor = NothingWhite
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onCheckPassword(passwordInput) },
+                    colors = ButtonDefaults.buttonColors(containerColor = NothingWhite)
+                ) {
+                    Text("SUBMIT", color = Color.Black, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onLogoutTelegram) {
+                    Text("CANCEL", color = NothingGray, fontFamily = FontFamily.Monospace)
                 }
             }
         )

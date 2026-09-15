@@ -57,6 +57,8 @@ import com.jayesh.cashcollect.ui.theme.CashCollectTheme
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
 import com.jayesh.cashcollect.ui.theme.NothingMuted
+import androidx.compose.material.icons.filled.Dashboard
+import com.jayesh.cashcollect.ui.dashboard.DashboardScreen
 import com.jayesh.cashcollect.ui.theme.NothingWhite
 import com.jayesh.cashcollect.widget.CashCollectWidgetProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +67,7 @@ import kotlinx.coroutines.launch
 sealed class Screen {
     object Collections : Screen()
     object Insights : Screen()
+    object Dashboard : Screen()
     object History : Screen()
     object Settings : Screen()
     object AddCollection : Screen()
@@ -93,7 +96,8 @@ class MainActivity : ComponentActivity() {
                         collectionRepo = app.collectionRepository,
                         customerRepo = app.customerRepository,
                         settingsRepo = app.settingsRepository,
-                        notificationManager = app.notificationManager
+                        notificationManager = app.notificationManager,
+                        telegramManager = app.telegramManager
                     )
                 )
 
@@ -106,7 +110,8 @@ class MainActivity : ComponentActivity() {
 
                 val settingsViewModel: SettingsViewModel = viewModel(
                     factory = SettingsViewModel.Factory(
-                        settingsRepo = app.settingsRepository
+                        settingsRepo = app.settingsRepository,
+                        telegramManager = app.telegramManager
                     )
                 )
 
@@ -137,6 +142,7 @@ class MainActivity : ComponentActivity() {
 
                 val isRootTab = currentScreen is Screen.Collections ||
                         currentScreen is Screen.Insights ||
+                        currentScreen is Screen.Dashboard ||
                         currentScreen is Screen.History ||
                         currentScreen is Screen.Settings
 
@@ -184,6 +190,27 @@ class MainActivity : ComponentActivity() {
                                                 text = if (currentScreen is Screen.Insights) "[ INSIGHTS ]" else "INSIGHTS",
                                                 fontFamily = FontFamily.Monospace,
                                                 fontWeight = if (currentScreen is Screen.Insights) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 10.sp,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = NothingWhite,
+                                            selectedTextColor = NothingWhite,
+                                            indicatorColor = Color.Transparent,
+                                            unselectedIconColor = NothingMuted,
+                                            unselectedTextColor = NothingMuted
+                                        )
+                                    )
+                                    NavigationBarItem(
+                                        selected = currentScreen is Screen.Dashboard,
+                                        onClick = { currentScreen = Screen.Dashboard },
+                                        icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
+                                        label = {
+                                            Text(
+                                                text = if (currentScreen is Screen.Dashboard) "[ DASHBOARD ]" else "DASHBOARD",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = if (currentScreen is Screen.Dashboard) FontWeight.Bold else FontWeight.Normal,
                                                 fontSize = 10.sp,
                                                 letterSpacing = 0.5.sp
                                             )
@@ -266,6 +293,24 @@ class MainActivity : ComponentActivity() {
 
                             is Screen.Insights -> {
                                 InsightsScreen(collections = historyList)
+                            }
+
+                            is Screen.Dashboard -> {
+                                val currentSettings by settingsViewModel.settings.collectAsStateWithLifecycle()
+                                val authState by settingsViewModel.telegramAuthState.collectAsStateWithLifecycle()
+                                DashboardScreen(
+                                    collections = historyList,
+                                    appSettings = currentSettings,
+                                    telegramAuthState = authState,
+                                    onQuickCaptureClick = {
+                                        currentScreen = Screen.Collections
+                                        shouldOpenQuickCapture = true
+                                    },
+                                    onCollectionClick = { id -> currentScreen = Screen.Detail(id) },
+                                    onGoToHistory = { currentScreen = Screen.History },
+                                    onGoToSettings = { currentScreen = Screen.Settings },
+                                    onExportCsv = { historyViewModel.exportCsv(this@MainActivity) }
+                                )
                             }
 
                             is Screen.AddCollection -> {
