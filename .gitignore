@@ -19,3 +19,5 @@ app/build/
 *.tar.gz
 app/libs/*.aar
 build-output/
+CollectFlow-APKs/
+*.apk
