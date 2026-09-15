@@ -58,6 +58,8 @@ class TelegramManager(private val context: Context) {
     var onMessageSendSucceeded: ((collectionId: Long) -> Unit)? = null
     var onMessageSendFailed: ((collectionId: Long, error: String) -> Unit)? = null
 
+    fun isReady(): Boolean = _authState.value is TelegramAuthState.Ready
+
     private var currentApiId: Int = 0
     private var currentApiHash: String = ""
 
@@ -187,7 +189,7 @@ class TelegramManager(private val context: Context) {
                 val collectionId = pendingOutboundMessages.remove(tempId)
                     ?: pendingOutboundMessages.remove(update.message.id)
                 if (collectionId != null) {
-                    val errMsg = update.errorMessage.ifBlank { "Error code: ${update.errorCode}" }
+                    val errMsg = update.error?.message?.ifBlank { "Error code: ${update.error?.code}" } ?: "Send failed"
                     Log.e(TAG, "Message send failed for collection #$collectionId: $errMsg")
                     onMessageSendFailed?.invoke(collectionId, errMsg)
                 }

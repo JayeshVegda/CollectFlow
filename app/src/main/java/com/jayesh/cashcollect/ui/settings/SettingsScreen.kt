@@ -124,7 +124,7 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
-    telegramAuthState: TelegramAuthState = TelegramAuthState.LoggedOut,
+    telegramAuthState: TelegramAuthState = TelegramAuthState.Uninitialized,
     onSaveNumber: (String) -> Unit,
     onSaveTemplate: (String) -> Unit,
     onSaveRate: (Int) -> Unit,
@@ -278,10 +278,11 @@ fun SettingsScreen(
                         // Status pill
                         val (statusText, statusBg, statusFg) = when (telegramAuthState) {
                             is TelegramAuthState.Ready -> Triple("ONLINE", NothingGreen.copy(alpha = 0.2f), NothingGreen)
-                            is TelegramAuthState.WaitingForQrCode, is TelegramAuthState.ShowingQr -> Triple("SCAN QR", NothingAmber.copy(alpha = 0.2f), NothingAmber)
-                            is TelegramAuthState.WaitingForPassword -> Triple("2FA REQ", NothingAmber.copy(alpha = 0.2f), NothingAmber)
+                            is TelegramAuthState.ShowingQr -> Triple("SCAN QR", NothingAmber.copy(alpha = 0.2f), NothingAmber)
+                            is TelegramAuthState.WaitingPassword -> Triple("2FA REQ", NothingAmber.copy(alpha = 0.2f), NothingAmber)
+                            is TelegramAuthState.WaitingParameters, is TelegramAuthState.Initializing -> Triple("CONNECTING", NothingAmber.copy(alpha = 0.2f), NothingAmber)
                             is TelegramAuthState.Error -> Triple("ERROR", NothingRed.copy(alpha = 0.2f), NothingRed)
-                            is TelegramAuthState.LoggedOut -> Triple("OFFLINE", NothingCardRaised, NothingGray)
+                            is TelegramAuthState.Uninitialized, is TelegramAuthState.Closed -> Triple("OFFLINE", NothingCardRaised, NothingGray)
                         }
 
                         Box(
@@ -773,10 +774,15 @@ fun SettingsScreen(
                             .padding(8.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            bitmap = qrState.qrBitmap,
-                            contentDescription = "Telegram QR Code",
-                            modifier = Modifier.fillMaxSize()
+                        qrState.qrBitmap?.let { bmp ->
+                            Image(
+                                bitmap = bmp,
+                                contentDescription = "Telegram QR Code",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } ?: androidx.compose.material3.CircularProgressIndicator(
+                            color = Color.Black,
+                            modifier = Modifier.size(32.dp)
                         )
                     }
 
@@ -798,7 +804,7 @@ fun SettingsScreen(
     }
 
     // Telegram 2FA Password Dialog
-    if (telegramAuthState is TelegramAuthState.WaitingForPassword) {
+    if (telegramAuthState is TelegramAuthState.WaitingPassword) {
         var passwordInput by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = onLogoutTelegram,

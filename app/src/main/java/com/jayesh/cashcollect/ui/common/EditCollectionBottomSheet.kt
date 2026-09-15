@@ -126,8 +126,16 @@ fun EditCollectionBottomSheet(
 
             // Keypad
             AmountKeypad(
-                rawDigits = rawDigits,
-                onDigitsChanged = { rawDigits = it }
+                onDigitClick = { digit ->
+                    if (rawDigits == "0") rawDigits = digit
+                    else if (rawDigits.length < 9) rawDigits += digit
+                },
+                onBackspaceClick = {
+                    if (rawDigits.isNotEmpty()) rawDigits = rawDigits.dropLast(1)
+                },
+                onClearClick = {
+                    rawDigits = ""
+                }
             )
 
             // Note field

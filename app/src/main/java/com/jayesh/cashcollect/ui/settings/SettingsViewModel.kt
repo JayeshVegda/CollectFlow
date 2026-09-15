@@ -89,7 +89,7 @@ class SettingsViewModel(
             val sample = CollectionItem(
                 id = 999999L,
                 customerId = 1L,
-                customerDisplayName = "Test Customer",
+                customerName = "Test Customer",
                 customerAlias = null,
                 amountPaise = 500000L,
                 commissionRateSnapshot = s.commissionRatePerThousand,
