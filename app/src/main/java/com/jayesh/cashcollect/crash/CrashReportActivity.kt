@@ -80,17 +80,22 @@ class CrashReportActivity : ComponentActivity() {
         val message = intent.getStringExtra(EXTRA_ERROR_MESSAGE) ?: "Unexpected runtime exception"
 
         setContent {
-            CrashScreen(
-                errorMessage = message,
-                fullReport = report,
-                onCopy = { copyToClipboard(report) },
-                onResetDb = {
-                    AppDatabase.resetDatabase(this)
-                    Toast.makeText(this, "Database cleared. Restarting...", Toast.LENGTH_SHORT).show()
-                    restartApp()
-                },
-                onRestart = { restartApp() }
-            )
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.lifecycle.compose.LocalLifecycleOwner provides this,
+                androidx.compose.ui.platform.LocalLifecycleOwner provides this
+            ) {
+                CrashScreen(
+                    errorMessage = message,
+                    fullReport = report,
+                    onCopy = { copyToClipboard(report) },
+                    onResetDb = {
+                        AppDatabase.resetDatabase(this)
+                        Toast.makeText(this, "Database cleared. Restarting...", Toast.LENGTH_SHORT).show()
+                        restartApp()
+                    },
+                    onRestart = { restartApp() }
+                )
+            }
         }
     }
 

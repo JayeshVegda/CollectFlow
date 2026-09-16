@@ -5,8 +5,12 @@
 # Keep Annotations & Signatures for reflection/serialization
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# Keep Compose
+# Keep Compose & Lifecycle CompositionLocals
 -keep class androidx.compose.** { *; }
+-keep class androidx.lifecycle.compose.** { *; }
+-keep class androidx.compose.ui.platform.AndroidCompositionLocals_androidKt {
+    public static *** getLocalLifecycleOwner();
+}
 
 # Keep Room Database & Generated Impls
 -keep class androidx.room.** { *; }

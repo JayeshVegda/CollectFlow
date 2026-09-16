@@ -124,11 +124,15 @@ class MainActivity : ComponentActivity() {
         val openQuickCaptureDirectly = intent.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false)
 
         setContent {
-            LaunchedEffect(Unit) {
-                requestNotificationPermissionIfNeeded()
-            }
-            CashCollectTheme {
-                val collectViewModel: CollectViewModel = viewModel(
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.lifecycle.compose.LocalLifecycleOwner provides this,
+                androidx.compose.ui.platform.LocalLifecycleOwner provides this
+            ) {
+                LaunchedEffect(Unit) {
+                    requestNotificationPermissionIfNeeded()
+                }
+                CashCollectTheme {
+                    val collectViewModel: CollectViewModel = viewModel(
                     factory = CollectViewModel.Factory(
                         collectionRepo = app.collectionRepository,
                         customerRepo = app.customerRepository,
