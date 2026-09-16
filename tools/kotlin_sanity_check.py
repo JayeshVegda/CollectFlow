@@ -110,6 +110,14 @@ def main() -> int:
                     f'{rel}: unbalanced {o}{c} ({code.count(o)} vs {code.count(c)})'
                 )
 
+        # Two statements merged onto one line, e.g. "}    Scaffold(" - the classic symptom
+        # of concatenating generated files that lack a trailing newline. Braces still
+        # balance in that case, so the delimiter check above would NOT catch it. (This
+        # actually shipped once.)
+        for idx, line in enumerate(code.splitlines(), start=1):
+            if re.search(r'\}\s{2,}[A-Za-z_]\w*\s*\(', line):
+                problems.append(f'{rel}:{idx}: suspicious merged line -> {line.strip()[:60]}')
+
         seen_decl = False
         imports = []
         for line in code.splitlines():

@@ -79,7 +79,8 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
-import java.util.Locale/*
+import java.util.Locale
+/*
  * TODAY — plain, minimal, one list.
  *
  * Design decisions taken from direct operator feedback on the previous iteration:
@@ -136,7 +137,8 @@ fun CollectRoute(
         onBulkReceiveAndSend = { items -> viewModel.receiveAndSendAll(context, items) },
         onBulkMarkSent = { items -> viewModel.markAllSent(context, items) }
     )
-}@OptIn(ExperimentalMaterial3Api::class)
+}
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollectionsScreen(
     todayStats: TodayStats = TodayStats(),
@@ -194,7 +196,8 @@ fun CollectionsScreen(
     BackHandler(enabled = selectionMode) {
         selectedIds.clear()
         selectionMode = false
-    }    Scaffold(
+    }
+    Scaffold(
         containerColor = NothingBlack,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -241,7 +244,8 @@ fun CollectionsScreen(
                 Text(text = "QUICK CAPTURE", style = AppType.labelMono, color = Color.Black)
             }
         }
-    ) { paddingValues ->        LazyColumn(
+    ) { paddingValues ->
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -319,7 +323,8 @@ fun CollectionsScreen(
                 }
             }
         }
-    }    if (isQuickCaptureOpen) {
+    }
+    if (isQuickCaptureOpen) {
         QuickCaptureBottomSheet(
             sheetState = quickCaptureSheetState,
             commissionRatePerThousand = commissionRatePerThousand,
@@ -363,7 +368,8 @@ fun CollectionsScreen(
             }
         )
     }
-}/**
+}
+/**
  * The top board: today's summary, and the only place numbers live.
  *
  * Per operator feedback this is where "the today thing" belongs - the hero number is money
@@ -444,7 +450,8 @@ private fun TodayBoard(
             }
         }
     }
-}/**
+}
+/**
  * One entry. Exactly four facts, per operator feedback:
  *
  *     name + amount        (primary line)
@@ -576,7 +583,8 @@ private fun CollectionRow(
             }
         }
     }
-}/** Revealed behind a row while it is being swiped. Colour is on the label only. */
+}
+/** Revealed behind a row while it is being swiped. Colour is on the label only. */
 @Composable
 private fun SwipeBackdrop(startLabel: String, endLabel: String) {
     Row(
@@ -605,7 +613,8 @@ private fun SwipeBackdrop(startLabel: String, endLabel: String) {
             Text(text = endLabel, style = AppType.labelMono, color = NothingRed)
         }
     }
-}/** Bulk bar shown while rows are multi-selected. */
+}
+/** Bulk bar shown while rows are multi-selected. */
 @Composable
 private fun BulkActionBar(
     selectedCount: Int,
@@ -687,7 +696,8 @@ private fun BulkActionBar(
             }
         }
     }
-}/**
+}
+/**
  * Day only. The operator explicitly does not care about the time of day - only the day,
  * amount, name and commission matter - and "Today" / "Yesterday" read faster than a date
  * for the two cases that come up constantly.
