@@ -56,12 +56,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
+import com.jayesh.cashcollect.domain.state.CollectionStatus
 import com.jayesh.cashcollect.ui.common.AmountText
 import com.jayesh.cashcollect.ui.common.AppEmptyState
 import com.jayesh.cashcollect.ui.common.AppSectionLabel
 import com.jayesh.cashcollect.ui.common.AppSurface
 import com.jayesh.cashcollect.ui.common.EditCollectionBottomSheet
-import com.jayesh.cashcollect.ui.common.StatusBadge
 import com.jayesh.cashcollect.ui.theme.AppType
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingBlack
@@ -77,24 +77,27 @@ import com.jayesh.cashcollect.ui.theme.TextSecondary
 import com.jayesh.cashcollect.ui.theme.TextTertiary
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
-import java.util.Locale
-/*
- * TODAY — the daily loop
- * ----------------------
- * The operator's real job is a loop over ~10-15 parties:
+import java.util.Locale/*
+ * TODAY — plain, minimal, one list.
  *
- *     brother says "collect Rs.X from Y"   ->  TO COLLECT   (PENDING)
- *     cash is handed over                  ->  TO REPORT    (RECEIPT_CONFIRMED)
- *     brother is told on WhatsApp          ->  DONE         (CONFIRMED)
+ * Design decisions taken from direct operator feedback on the previous iteration:
  *
- * So this screen answers those three questions instead of leading with a generic
- * "today's total" KPI, and it leads with exactly one primary number.
+ *  - The swipe hint line was noise. Removed; the gesture is discoverable by using it.
+ *  - The TO COLLECT / TO REPORT / DONE switcher was over-structuring. At three or four
+ *    entries a day a single list is the simplest thing that can be correct, so the buckets
+ *    are merged back into one list.
+ *  - Time-of-day is not useful. What matters per entry is day, amount, name, commission.
+ *  - The top board carries the summary numbers; the list carries entries.
  *
- * Previously the screen led with TODAY COLLECTED (a vanity metric for a tool used daily)
- * and listed PENDING/OUTSTANDING as two loose sections, which meant the one state that
- * actually causes a problem — cash collected but not yet reported, the thing the operator
- * said they "sometimes forget" — had no home of its own.
+ * Interaction stays silent and unchanged: swipe right advances an entry (cash received,
+ * then send on WhatsApp), swipe left cancels it, long-press selects for bulk actions.
+ *
+ * One 8dp dot per row carries status so no badge is needed:
+ *   amber = cash received, not reported to the brother yet
+ *   dim   = still to collect
+ *   green = reported
  */
 
 @Composable
@@ -126,23 +129,14 @@ fun CollectRoute(
         onCollectionClick = onCollectionClick,
         onReceiveAndWhatsApp = { item -> viewModel.confirmReceive(context, item) },
         onOpenWhatsAppAgain = { item -> viewModel.openWhatsAppAgain(context, item) },
-        onConfirmSent = { id -> viewModel.confirmSent(context, id) },
+        onConfirmReported = { id -> viewModel.confirmSent(context, id) },
         onDeleteCollection = { id -> viewModel.deleteCollection(context, id) },
         onUpdateCollection = { id, amt, note -> viewModel.updateCollection(context, id, amt, note) },
         onVoidInstantly = { item -> viewModel.voidInstantly(context, item) },
         onBulkReceiveAndSend = { items -> viewModel.receiveAndSendAll(context, items) },
         onBulkMarkSent = { items -> viewModel.markAllSent(context, items) }
     )
-}
-
-/** The three questions this screen answers. */
-private enum class TodayTab(val label: String) {
-    TO_COLLECT("TO COLLECT"),
-    TO_REPORT("TO REPORT"),
-    DONE("DONE")
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
+}@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollectionsScreen(
     todayStats: TodayStats = TodayStats(),
@@ -157,7 +151,7 @@ fun CollectionsScreen(
     onCollectionClick: (Long) -> Unit,
     onReceiveAndWhatsApp: (CollectionItem) -> Unit,
     onOpenWhatsAppAgain: (CollectionItem) -> Unit,
-    onConfirmSent: (Long) -> Unit,
+    onConfirmReported: (Long) -> Unit,
     onDeleteCollection: (Long) -> Unit,
     onUpdateCollection: (Long, Long, String?) -> Unit,
     onVoidInstantly: (CollectionItem) -> Unit = {},
@@ -175,14 +169,19 @@ fun CollectionsScreen(
     var itemToEdit by remember { mutableStateOf<CollectionItem?>(null) }
     val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var tab by remember { mutableStateOf(TodayTab.TO_COLLECT) }
-
     var selectionMode by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<Long>() }
 
+    // One merged list, most recently acted on first. No buckets and no switcher: with three
+    // or four entries a day, a single list is the simplest thing that can be correct.
+    val entries = remember(pendingList, outstandingList, doneTodayList) {
+        (pendingList + outstandingList + doneTodayList)
+            .sortedByDescending { it.receivedAt ?: it.createdAt }
+    }
+
     // Drop selections that no longer exist (e.g. reported from another screen).
-    LaunchedEffect(pendingList, outstandingList) {
-        val stillPresent = (pendingList + outstandingList).map { it.id }.toSet()
+    LaunchedEffect(entries) {
+        val stillPresent = entries.map { it.id }.toSet()
         selectedIds.removeAll { it !in stillPresent }
         if (selectedIds.isEmpty()) selectionMode = false
     }
@@ -195,19 +194,7 @@ fun CollectionsScreen(
     BackHandler(enabled = selectionMode) {
         selectedIds.clear()
         selectionMode = false
-    }
-
-    val toCollectTotal = pendingList.sumOf { it.amountPaise }
-    val toReportTotal = outstandingList.sumOf { it.amountPaise }
-
-    val activeList = when (tab) {
-        TodayTab.TO_COLLECT -> pendingList
-        TodayTab.TO_REPORT -> outstandingList
-        TodayTab.DONE -> doneTodayList
-    }
-    val ledger = remember(activeList) { buildLedger(activeList) }
-
-    Scaffold(
+    }    Scaffold(
         containerColor = NothingBlack,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -254,42 +241,27 @@ fun CollectionsScreen(
                 Text(text = "QUICK CAPTURE", style = AppType.labelMono, color = Color.Black)
             }
         }
-    ) { paddingValues ->
-        LazyColumn(
+    ) { paddingValues ->        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = Space.gutter),
             contentPadding = PaddingValues(top = Space.sm, bottom = 104.dp)
         ) {
-            item(key = "hero") {
-                TodayHero(
-                    toCollectPaise = toCollectTotal,
+            item(key = "board") {
+                TodayBoard(
+                    collectedPaise = todayStats.totalPaise,
+                    commissionPaise = todayStats.commissionPaise,
+                    entryCount = todayStats.count,
+                    toCollectPaise = pendingList.sumOf { it.amountPaise },
                     toCollectCount = pendingList.size,
-                    toReportPaise = toReportTotal,
-                    toReportCount = outstandingList.size,
-                    todayCollectedPaise = todayStats.totalPaise,
-                    todayCommissionPaise = todayStats.commissionPaise,
-                    onAttentionClick = { tab = TodayTab.TO_REPORT }
-                )
-            }
-
-            item(key = "tabs") {
-                Spacer(modifier = Modifier.height(Space.md))
-                TodayTabs(
-                    selected = tab,
-                    counts = mapOf(
-                        TodayTab.TO_COLLECT to pendingList.size,
-                        TodayTab.TO_REPORT to outstandingList.size,
-                        TodayTab.DONE to doneTodayList.size
-                    ),
-                    onSelect = { tab = it }
+                    waitingToReport = outstandingList.size
                 )
             }
 
             if (selectionMode) {
                 item(key = "bulk") {
-                    Spacer(modifier = Modifier.height(Space.sm))
+                    Spacer(modifier = Modifier.height(Space.md))
                     BulkActionBar(
                         selectedCount = selectedIds.size,
                         pendingCount = pendingList.count { it.id in selectedIds },
@@ -312,59 +284,42 @@ fun CollectionsScreen(
                 }
             }
 
-            item(key = "hint") {
-                Spacer(modifier = Modifier.height(Space.md))
-                Text(
-                    text = when (tab) {
-                        TodayTab.TO_COLLECT -> "Swipe right for cash received  ·  swipe left to cancel  ·  hold to select"
-                        TodayTab.TO_REPORT -> "Tap REPORT to send on WhatsApp, then mark it reported"
-                        TodayTab.DONE -> "Reported to your brother today"
-                    },
-                    style = AppType.caption,
-                    color = TextTertiary
-                )
-            }
-
-            if (ledger.isEmpty()) {
+            if (entries.isEmpty()) {
                 item(key = "empty") {
                     AppEmptyState(
-                        title = when (tab) {
-                            TodayTab.TO_COLLECT -> "Nothing to collect."
-                            TodayTab.TO_REPORT -> "Nothing waiting to be reported."
-                            TodayTab.DONE -> "Nothing finished yet today."
-                        },
-                        hint = when (tab) {
-                            TodayTab.TO_COLLECT -> "Tap QUICK CAPTURE when your brother gives you a collection."
-                            TodayTab.TO_REPORT -> "Mark cash received and it waits here until reported."
-                            TodayTab.DONE -> "Entries you have reported appear here."
-                        }
+                        title = "No entries yet.",
+                        hint = "Tap QUICK CAPTURE to add one."
                     )
                 }
             } else {
-                items(ledger, key = { it.key }) { entry ->
-                    LedgerEntryView(
-                        entry = entry,
-                        tab = tab,
-                        selectionMode = selectionMode,
-                        selectedIds = selectedIds,
-                        onToggleSelect = { id ->
-                            if (id in selectedIds) selectedIds.remove(id) else selectedIds.add(id)
-                        },
-                        onLongPress = { id ->
+                items(entries, key = { it.id }) { item ->
+                    CollectionRow(
+                        item = item,
+                        isSelected = item.id in selectedIds,
+                        onLongClick = {
                             selectionMode = true
-                            if (id !in selectedIds) selectedIds.add(id)
+                            if (item.id !in selectedIds) selectedIds.add(item.id)
                         },
-                        onRowClick = onCollectionClick,
-                        onReceive = onReceiveAndWhatsApp,
-                        onReport = onOpenWhatsAppAgain,
-                        onVoid = onVoidInstantly
+                        onTap = {
+                            if (selectionMode) {
+                                if (item.id in selectedIds) {
+                                    selectedIds.remove(item.id)
+                                } else {
+                                    selectedIds.add(item.id)
+                                }
+                            } else {
+                                onCollectionClick(item.id)
+                            }
+                        },
+                        onReceive = { onReceiveAndWhatsApp(item) },
+                        onOpenWhatsApp = { onOpenWhatsAppAgain(item) },
+                        onMarkReported = { onConfirmReported(item.id) },
+                        onVoid = { onVoidInstantly(item) }
                     )
                 }
             }
         }
-    }
-
-    if (isQuickCaptureOpen) {
+    }    if (isQuickCaptureOpen) {
         QuickCaptureBottomSheet(
             sheetState = quickCaptureSheetState,
             commissionRatePerThousand = commissionRatePerThousand,
@@ -408,23 +363,22 @@ fun CollectionsScreen(
             }
         )
     }
-}
-
-/**
- * The hero: exactly ONE primary number, plus the one urgent secondary if it exists.
+}/**
+ * The top board: today's summary, and the only place numbers live.
  *
- * Today's collected total is deliberately demoted to a quiet footer line - it is metadata
- * about what already happened, not a to-do. The primary is what still has to happen.
+ * Per operator feedback this is where "the today thing" belongs - the hero number is money
+ * actually collected today, with commission and entry count beside it. The pending total
+ * sits below a hairline, and the single amber line calls out anything collected but not yet
+ * reported to the brother, because that is the state that silently gets forgotten.
  */
 @Composable
-private fun TodayHero(
+private fun TodayBoard(
+    collectedPaise: Long,
+    commissionPaise: Long,
+    entryCount: Int,
     toCollectPaise: Long,
     toCollectCount: Int,
-    toReportPaise: Long,
-    toReportCount: Int,
-    todayCollectedPaise: Long,
-    todayCommissionPaise: Long,
-    onAttentionClick: () -> Unit
+    waitingToReport: Int
 ) {
     AppSurface(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -433,28 +387,21 @@ private fun TodayHero(
                 .padding(Space.md),
             verticalArrangement = Arrangement.spacedBy(Space.xs)
         ) {
-            AppSectionLabel(text = "To collect", color = TextSecondary)
+            AppSectionLabel(text = "Today collected", color = TextSecondary)
 
             AmountText(
-                amountPaise = toCollectPaise,
+                amountPaise = collectedPaise,
                 style = AppType.displayMoney,
                 color = TextDisplay,
                 align = TextAlign.Start
             )
 
             Text(
-                text = if (toCollectCount == 1) "1 PARTY" else "$toCollectCount PARTIES",
+                text = "COMM " + Paise(commissionPaise).toFormattedRupees() +
+                    "   ·   " + entryCount + (if (entryCount == 1) " ENTRY" else " ENTRIES"),
                 style = AppType.labelMono,
                 color = TextTertiary
             )
-
-            if (toReportCount > 0) {
-                Spacer(modifier = Modifier.height(Space.sm))
-                AttentionRow(
-                    text = "$toReportCount COLLECTED, NOT REPORTED YET - TAP TO REVIEW",
-                    onClick = onAttentionClick
-                )
-            }
 
             Spacer(modifier = Modifier.height(Space.sm))
             Box(
@@ -463,97 +410,173 @@ private fun TodayHero(
                     .height(1.dp)
                     .background(SurfaceDivider)
             )
-            Spacer(modifier = Modifier.height(Space.xs))
+            Spacer(modifier = Modifier.height(Space.sm))
 
-            Text(
-                text = "TODAY " + Paise(todayCollectedPaise).toFormattedRupees() +
-                    " COLLECTED   ·   " + Paise(todayCommissionPaise).toFormattedRupees() + " COMMISSION",
-                style = AppType.caption,
-                color = TextTertiary
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun AttentionRow(text: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.chip))
-            .background(SurfaceRaised)
-            .border(1.dp, NothingAmber, RoundedCornerShape(Radius.chip))
-            .combinedClickable(onClick = onClick)
-            .padding(horizontal = Space.sm, vertical = Space.sm),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // weight(1f) + maxLines = 2 so the label wraps instead of pushing the arrow off the
-        // right edge (it was being clipped at 11sp monospace tracking).
-        Text(
-            text = text,
-            style = AppType.labelMono,
-            color = NothingAmber,
-            modifier = Modifier.weight(1f),
-            maxLines = 2
-        )
-        Spacer(modifier = Modifier.width(Space.xs))
-        Text(
-            text = "->",
-            style = AppType.labelMono,
-            color = NothingAmber,
-            maxLines = 1
-        )
-    }
-}
-
-/**
- * The three-question switcher. A plain row of pills rather than a Material segmented
- * control, because the labels are monospace and must stay on the 8dp rhythm.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun TodayTabs(
-    selected: TodayTab,
-    counts: Map<TodayTab, Int>,
-    onSelect: (TodayTab) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Space.sm)
-    ) {
-        for (tab in TodayTab.values()) {
-            val isSelected = tab == selected
-            val count = counts[tab] ?: 0
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(Space.touchTarget)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(if (isSelected) SurfaceRaised else Color.Transparent)
-                    .border(
-                        width = 1.dp,
-                        color = if (isSelected) NothingWhite else SurfaceDivider,
-                        shape = RoundedCornerShape(Radius.pill)
-                    )
-                    .combinedClickable(onClick = { onSelect(tab) }),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                Column {
+                    Text(text = "TO COLLECT", style = AppType.labelMono, color = TextSecondary)
+                    Text(
+                        text = Paise(toCollectPaise).toFormattedRupees(),
+                        style = AppType.amount,
+                        color = TextDisplay
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(text = "PARTIES", style = AppType.labelMono, color = TextSecondary)
+                    Text(
+                        text = toCollectCount.toString(),
+                        style = AppType.amount,
+                        color = TextDisplay
+                    )
+                }
+            }
+
+            if (waitingToReport > 0) {
+                Spacer(modifier = Modifier.height(Space.xs))
                 Text(
-                    text = if (count > 0) tab.label + " " + count else tab.label,
+                    text = waitingToReport.toString() + " WAITING TO BE REPORTED",
                     style = AppType.labelMono,
-                    color = when {
-                        isSelected -> TextDisplay
-                        tab == TodayTab.TO_REPORT && count > 0 -> NothingAmber
-                        else -> TextSecondary
-                    }
+                    color = NothingAmber
                 )
             }
         }
     }
-}
+}/**
+ * One entry. Exactly four facts, per operator feedback:
+ *
+ *     name + amount        (primary line)
+ *     day  + commission    (secondary line)
+ *
+ * Status is a single 8dp dot instead of a badge, so the row stays quiet:
+ *   amber = cash received, not reported yet  ·  dim = to collect  ·  green = reported
+ *
+ * Swipe handling follows the Material 3 rule strictly - the action fires once from the
+ * settled value and the box is reset, never inside `confirmValueChange` (which can fire
+ * repeatedly while a gesture settles). The database stays the single source of truth.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun CollectionRow(
+    item: CollectionItem,
+    isSelected: Boolean,
+    onLongClick: () -> Unit,
+    onTap: () -> Unit,
+    onReceive: () -> Unit,
+    onOpenWhatsApp: () -> Unit,
+    onMarkReported: () -> Unit,
+    onVoid: () -> Unit
+) {
+    val shape = RoundedCornerShape(Radius.card)
+    val isPending = item.status == CollectionStatus.PENDING
+    val isReported = item.status == CollectionStatus.CONFIRMED
 
-/** Revealed behind a row while it is being swiped. Colour is on the label only. */
+    val dismissState = rememberSwipeToDismissBoxState()
+
+    // Swipe right advances the entry: take the cash, then send it on WhatsApp.
+    val advance: () -> Unit = if (isPending) onReceive else onOpenWhatsApp
+
+    LaunchedEffect(dismissState.currentValue) {
+        when (dismissState.currentValue) {
+            SwipeToDismissBoxValue.StartToEnd -> {
+                advance()
+                dismissState.reset()
+            }
+            SwipeToDismissBoxValue.EndToStart -> {
+                onVoid()
+                dismissState.reset()
+            }
+            SwipeToDismissBoxValue.Settled -> Unit
+        }
+    }
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            SwipeBackdrop(
+                startLabel = if (isPending) "RECEIVED" else "WHATSAPP",
+                endLabel = "CANCEL"
+            )
+        },
+        modifier = Modifier.padding(bottom = Space.listAdjacent)
+    ) {
+        AppSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = if (isSelected) 2.dp else 1.dp,
+                    color = if (isSelected) NothingRed else SurfaceDivider,
+                    shape = shape
+                )
+                .combinedClickable(onClick = onTap, onLongClick = onLongClick),
+            shape = shape
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Space.md, vertical = Space.md),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.sm)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(
+                            when {
+                                isPending -> SurfaceDivider
+                                isReported -> NothingGreen
+                                else -> NothingAmber
+                            }
+                        )
+                )
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.customerDisplayName,
+                        style = AppType.subheading,
+                        color = if (isReported) TextSecondary else TextDisplay,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(Space.xxs))
+                    Text(
+                        text = dayLabel(item.receivedAt ?: item.createdAt) +
+                            "   ·   comm " + Paise(item.commissionPaise).toFormattedRupees(),
+                        style = AppType.caption,
+                        color = TextTertiary,
+                        maxLines = 1
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    AmountText(
+                        amountPaise = item.amountPaise,
+                        style = AppType.amountLarge,
+                        color = if (isReported) TextSecondary else TextDisplay
+                    )
+                    // The only extra control on a row: a small SENT to close the loop once
+                    // WhatsApp has actually gone out. Shown only while awaiting reporting.
+                    if (!isPending && !isReported) {
+                        Spacer(modifier = Modifier.height(Space.xs))
+                        OutlinedButton(
+                            onClick = onMarkReported,
+                            shape = RoundedCornerShape(Radius.pill),
+                            border = BorderStroke(1.dp, NothingAmber),
+                            contentPadding = PaddingValues(horizontal = Space.sm, vertical = 0.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text(text = "SENT", style = AppType.labelMono, color = NothingAmber)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}/** Revealed behind a row while it is being swiped. Colour is on the label only. */
 @Composable
 private fun SwipeBackdrop(startLabel: String, endLabel: String) {
     Row(
@@ -582,53 +605,7 @@ private fun SwipeBackdrop(startLabel: String, endLabel: String) {
             Text(text = endLabel, style = AppType.labelMono, color = NothingRed)
         }
     }
-}
-
-/**
- * A party heading, emitted only when one party has more than one entry in the current
- * bucket. See [buildLedger] for why.
- */
-@Composable
-private fun PartyHeader(header: LedgerEntry.Header) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                top = if (header.first) Space.sm else Space.xl,
-                bottom = Space.sm
-            )
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = header.name,
-                    style = AppType.subheading,
-                    color = TextDisplay,
-                    maxLines = 1
-                )
-                if (!header.alias.isNullOrBlank()) {
-                    Text(
-                        text = header.alias,
-                        style = AppType.caption,
-                        color = TextTertiary,
-                        maxLines = 1
-                    )
-                }
-            }
-            Text(
-                text = if (header.count == 1) "1 ENTRY" else header.count.toString() + " ENTRIES",
-                style = AppType.labelMono,
-                color = TextTertiary
-            )
-        }
-    }
-}
-
-/** Bulk action bar shown while rows are multi-selected. */
+}/** Bulk bar shown while rows are multi-selected. */
 @Composable
 private fun BulkActionBar(
     selectedCount: Int,
@@ -656,7 +633,7 @@ private fun BulkActionBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "$selectedCount SELECTED",
+                    text = selectedCount.toString() + " SELECTED",
                     style = AppType.labelMonoLarge,
                     color = TextDisplay
                 )
@@ -710,281 +687,24 @@ private fun BulkActionBar(
             }
         }
     }
-}
-
-/** One rendered line in the ledger: either a party heading or a collection row. */
-private sealed interface LedgerEntry {
-    val key: String
-
-    data class Header(
-        val customerId: Long,
-        val name: String,
-        val alias: String?,
-        val count: Int,
-        val first: Boolean
-    ) : LedgerEntry {
-        override val key: String get() = "h" + customerId
-    }
-
-    data class Row(
-        val item: CollectionItem,
-        val showPartyName: Boolean
-    ) : LedgerEntry {
-        override val key: String get() = "i" + item.id
-    }
-}
-
-/**
- * Builds the visible list for the active bucket.
- *
- * Density decision: this operator has ~10-15 parties and usually one open item each, so
- * emitting a heading for every party would burn a third of the screen on repetition. A
- * heading is therefore only emitted when a party has MORE THAN ONE entry in the bucket,
- * where it genuinely clusters information. Single-entry parties stay a plain row, so the
- * common case stays dense and the grouped case still reads as structure.
- *
- * (Per-party totals and running balances belong on the PARTIES screen, where they are the
- * whole point rather than a side effect of the list.)
+}/**
+ * Day only. The operator explicitly does not care about the time of day - only the day,
+ * amount, name and commission matter - and "Today" / "Yesterday" read faster than a date
+ * for the two cases that come up constantly.
  */
-private fun buildLedger(items: List<CollectionItem>): List<LedgerEntry> {
-    val out = mutableListOf<LedgerEntry>()
-    var emittedAny = false
-    items.groupBy { it.customerId }.values.forEach { group ->
-        if (group.size == 1) {
-            out += LedgerEntry.Row(group.first(), showPartyName = true)
-            emittedAny = true
-        } else {
-            val first = group.first()
-            out += LedgerEntry.Header(
-                customerId = first.customerId,
-                name = first.customerName,
-                alias = first.customerAlias,
-                count = group.size,
-                first = !emittedAny
-            )
-            emittedAny = true
-            group.forEach { out += LedgerEntry.Row(it, showPartyName = false) }
-        }
-    }
-    return out
-}
+private fun dayLabel(timestamp: Long): String {
+    val startOfToday = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
 
-/**
- * Meta line for a TO REPORT row.
- *
- * When WhatsApp was opened but the entry was never marked reported, say so plainly. That
- * "handed off but unconfirmed" gap is exactly how a collected payment gets forgotten, which
- * is the problem this app exists to solve.
- */
-private fun reportMeta(item: CollectionItem): String {
-    val received = "received " + formatTimeAgo(item.receivedAt ?: item.createdAt)
-    val openedAt = item.whatsappOpenedAt
-    return if (openedAt != null) {
-        received + "  ·  WhatsApp opened " + formatTimeAgo(openedAt) + ", not marked reported"
-    } else {
-        received
-    }
-}
+    val oneDayMs = 24L * 60L * 60L * 1000L
 
-private fun formatTimeAgo(timestamp: Long): String {
-    val diff = System.currentTimeMillis() - timestamp
-    val mins = diff / (1000 * 60)
     return when {
-        mins < 1 -> "just now"
-        mins < 60 -> mins.toString() + "m ago"
-        mins < 1440 -> (mins / 60).toString() + "h ago"
+        timestamp >= startOfToday -> "Today"
+        timestamp >= startOfToday - oneDayMs -> "Yesterday"
         else -> SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(timestamp))
-    }
-}
-
-/**
- * One collection row.
- *
- * Swipe handling follows the Material 3 rule strictly: the state change is never performed
- * inside `confirmValueChange` (which can fire repeatedly while a gesture settles). Instead
- * the action fires once from the settled value and the box is reset, so the row stays in
- * the list and the database remains the single source of truth.
- */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-private fun LedgerRow(
-    item: CollectionItem,
-    showPartyName: Boolean,
-    isSelected: Boolean,
-    meta: String,
-    startLabel: String,
-    endLabel: String,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    onSwipeStartToEnd: () -> Unit,
-    onSwipeEndToStart: () -> Unit,
-    trailing: @Composable () -> Unit = {}
-) {
-    val shape = RoundedCornerShape(Radius.card)
-    val dismissState = rememberSwipeToDismissBoxState()
-
-    LaunchedEffect(dismissState.currentValue) {
-        when (dismissState.currentValue) {
-            SwipeToDismissBoxValue.StartToEnd -> {
-                onSwipeStartToEnd()
-                dismissState.reset()
-            }
-            SwipeToDismissBoxValue.EndToStart -> {
-                onSwipeEndToStart()
-                dismissState.reset()
-            }
-            SwipeToDismissBoxValue.Settled -> Unit
-        }
-    }
-
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = true,
-        enableDismissFromEndToStart = true,
-        backgroundContent = { SwipeBackdrop(startLabel, endLabel) },
-        modifier = Modifier.padding(bottom = Space.listAdjacent)
-    ) {
-        AppSurface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(
-                    width = if (isSelected) 2.dp else 1.dp,
-                    color = if (isSelected) NothingRed else SurfaceDivider,
-                    shape = shape
-                )
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-            shape = shape
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(Space.md),
-                verticalArrangement = Arrangement.spacedBy(Space.sm)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Space.sm)
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        if (showPartyName) {
-                            Text(
-                                text = item.customerDisplayName,
-                                style = AppType.subheading,
-                                color = TextDisplay,
-                                maxLines = 1
-                            )
-                            Spacer(modifier = Modifier.height(Space.xxs))
-                        }
-                        Text(
-                            text = meta,
-                            style = AppType.caption,
-                            color = TextTertiary,
-                            maxLines = 1
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        AmountText(
-                            amountPaise = item.amountPaise,
-                            style = AppType.amountLarge,
-                            color = TextDisplay
-                        )
-                        Spacer(modifier = Modifier.height(Space.xs))
-                        StatusBadge(status = item.status)
-                    }
-                }
-                trailing()
-            }
-        }
-    }
-}
-/** Renders one ledger line, choosing row content by the active bucket. */
-@Composable
-private fun LedgerEntryView(
-    entry: LedgerEntry,
-    tab: TodayTab,
-    selectionMode: Boolean,
-    selectedIds: List<Long>,
-    onToggleSelect: (Long) -> Unit,
-    onLongPress: (Long) -> Unit,
-    onRowClick: (Long) -> Unit,
-    onReceive: (CollectionItem) -> Unit,
-    onReport: (CollectionItem) -> Unit,
-    onVoid: (CollectionItem) -> Unit
-) {
-    when (entry) {
-        is LedgerEntry.Header -> PartyHeader(entry)
-        is LedgerEntry.Row -> {
-            val item = entry.item
-            val handleClick: () -> Unit =
-                if (selectionMode) {
-                    { onToggleSelect(item.id) }
-                } else {
-                    { onRowClick(item.id) }
-                }
-            val handleLongClick: () -> Unit = { onLongPress(item.id) }
-
-            when (tab) {
-                TodayTab.TO_COLLECT -> LedgerRow(
-                    item = item,
-                    showPartyName = entry.showPartyName,
-                    isSelected = item.id in selectedIds,
-                    meta = "promised " + formatTimeAgo(item.createdAt),
-                    startLabel = "RECEIVED",
-                    endLabel = "CANCEL",
-                    onClick = handleClick,
-                    onLongClick = handleLongClick,
-                    onSwipeStartToEnd = { onReceive(item) },
-                    onSwipeEndToStart = { onVoid(item) }
-                )
-
-                TodayTab.TO_REPORT -> LedgerRow(
-                    item = item,
-                    showPartyName = entry.showPartyName,
-                    isSelected = item.id in selectedIds,
-                    meta = reportMeta(item),
-                    startLabel = "WHATSAPP",
-                    endLabel = "CANCEL",
-                    onClick = handleClick,
-                    onLongClick = handleLongClick,
-                    onSwipeStartToEnd = { onReport(item) },
-                    onSwipeEndToStart = { onVoid(item) },
-                    trailing = {
-                        Button(
-                            onClick = { onReport(item) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(Space.touchTarget),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = NothingGreen,
-                                contentColor = Color.Black
-                            ),
-                            shape = RoundedCornerShape(Radius.pill)
-                        ) {
-                            Text(
-                                text = "REPORT ON WHATSAPP",
-                                style = AppType.labelMono,
-                                color = Color.Black
-                            )
-                        }
-                    }
-                )
-
-                TodayTab.DONE -> LedgerRow(
-                    item = item,
-                    showPartyName = entry.showPartyName,
-                    isSelected = item.id in selectedIds,
-                    meta = "reported " + formatTimeAgo(
-                        item.confirmedSentAt ?: item.receivedAt ?: item.createdAt
-                    ),
-                    startLabel = "WHATSAPP",
-                    endLabel = "CANCEL",
-                    onClick = handleClick,
-                    onLongClick = handleLongClick,
-                    onSwipeStartToEnd = { onReport(item) },
-                    onSwipeEndToStart = { onVoid(item) }
-                )
-            }
-        }
     }
 }
