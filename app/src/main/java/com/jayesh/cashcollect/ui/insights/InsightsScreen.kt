@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,12 +37,11 @@ import com.jayesh.cashcollect.domain.analytics.DailyTrendBucket
 import com.jayesh.cashcollect.domain.analytics.MonthlyBucket
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
+import com.jayesh.cashcollect.ui.common.GlassMetricRow
 import com.jayesh.cashcollect.ui.common.GlassSurface
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
 import com.jayesh.cashcollect.ui.theme.NothingCard
-import com.jayesh.cashcollect.ui.theme.NothingGlass
-import com.jayesh.cashcollect.ui.theme.NothingGlassBorder
 import com.jayesh.cashcollect.ui.theme.NothingGray
 import com.jayesh.cashcollect.ui.theme.NothingGreen
 import com.jayesh.cashcollect.ui.theme.NothingMuted
@@ -88,7 +86,7 @@ fun InsightsScreen(
                 GlassSurface(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Text(
-                            text = "TODAY'S CASH COLLECTED",
+                            text = "TODAY",
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
@@ -110,76 +108,41 @@ fun InsightsScreen(
                         ) {
                             Metric("COMMISSION", Paise(insights.todayCommissionPaise).toFormattedRupees(), NothingGreen)
                             Metric("TXNS", "${insights.todayCount}", NothingWhite)
-                            Metric("7D TOTAL", Paise(insights.weeklyTotalPaise).toFormattedRupees(), NothingWhite)
+                            Metric("7D", Paise(insights.weeklyTotalPaise).toFormattedRupees(), NothingWhite)
                         }
                     }
                 }
             }
 
             item {
-                GlassSurface(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "LAST 7 DAYS",
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                letterSpacing = 1.sp,
-                                color = NothingGray
-                            )
-                            Text(
-                                text = Paise(insights.weeklyTotalPaise).toFormattedRupees(),
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = NothingWhite
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        VolumeBarChart(buckets = insights.last7DaysTrend)
-                    }
-                }
+                GlassMetricRow(
+                    metrics = listOf(
+                        Triple("30D COLLECTED", Paise(insights.monthlyTotalPaise).toFormattedRupees(), NothingWhite),
+                        Triple("30D COMMISSION", Paise(insights.monthlyCommissionPaise).toFormattedRupees(), NothingGreen),
+                        Triple("AVG / DAY", Paise(insights.monthAvgPerDayPaise).toFormattedRupees(), NothingWhite)
+                    )
+                )
             }
 
             item {
                 GlassSurface(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Text(
-                            text = "LAST 30 DAYS",
+                            text = "LAST 7 DAYS",
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
                             letterSpacing = 1.sp,
                             color = NothingGray
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Metric("COLLECTED", Paise(insights.monthlyTotalPaise).toFormattedRupees(), NothingWhite)
-                            Metric("COMMISSION", Paise(insights.monthlyCommissionPaise).toFormattedRupees(), NothingGreen)
-                            Metric("AVG / DAY", Paise(insights.monthAvgPerDayPaise).toFormattedRupees(), NothingWhite)
-                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        VolumeBarChart(buckets = insights.last7DaysTrend)
                     }
                 }
             }
 
             item {
-                Text(
-                    text = "MONTHLY BREAKDOWN",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    letterSpacing = 1.sp,
-                    color = NothingGray,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                SectionLabel("MONTHLY")
             }
 
             items(insights.last6MonthsTrend) { bucket ->
@@ -187,15 +150,7 @@ fun InsightsScreen(
             }
 
             item {
-                Text(
-                    text = "TOP COUNTERPARTIES",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    letterSpacing = 1.sp,
-                    color = NothingGray,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                SectionLabel("TOP COUNTERPARTIES")
             }
 
             if (insights.topCustomers.isEmpty()) {
@@ -242,6 +197,19 @@ fun InsightsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Bold,
+        fontSize = 12.sp,
+        letterSpacing = 1.sp,
+        color = NothingGray,
+        modifier = Modifier.padding(top = 4.dp)
+    )
 }
 
 @Composable

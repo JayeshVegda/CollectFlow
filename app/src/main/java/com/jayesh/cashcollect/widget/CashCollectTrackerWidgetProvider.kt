@@ -39,8 +39,9 @@ class CashCollectTrackerWidgetProvider : AppWidgetProvider() {
             appWidgetIds: IntArray
         ) {
             CoroutineScope(Dispatchers.IO).launch {
-                val db = AppDatabase.getInstance(context)
-                val allCollections = db.collectionDao().getAllSync()
+                val allCollections = runCatching {
+                    AppDatabase.getInstance(context).collectionDao().getAllSync()
+                }.getOrElse { return@launch }
 
                 // Today 00:00:00
                 val cal = Calendar.getInstance().apply {

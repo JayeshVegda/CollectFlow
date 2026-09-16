@@ -1,9 +1,8 @@
-name: Build CollectFlow Debug APK
+name: Build CollectFlow APK
 
 on:
   push:
     branches: [ "main" ]
-    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
@@ -30,62 +29,52 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Decode signing keystore
+      - name: Prepare signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           mkdir -p keystore
-          printf '%s' "$KEYSTORE_BASE64" | base64 -d > keystore/collectflow.jks
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > keystore/collectflow.jks
+          else
+            echo "No KEYSTORE_BASE64 secret; generating an ephemeral debug keystore."
+            keytool -genkeypair -v \
+              -keystore keystore/collectflow.jks \
+              -storepass collectflow -keypass collectflow \
+              -alias collectflow -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=CollectFlow, OU=Dev, O=CollectFlow, L=NA, S=NA, C=IN"
+          fi
           ls -lh keystore/
-
-      - name: Ensure TDLib AARs
-        run: |
-          mkdir -p app/libs
-          if [ ! -f app/libs/core-release.aar ]; then
-            echo "Downloading core-release.aar..."
-            curl -L -s https://github.com/AkashPriyadarshii/tdlib-android/releases/download/v0.1.1/core-release.aar -o app/libs/core-release.aar
-          fi
-          if [ ! -f app/libs/ktx-release.aar ]; then
-            echo "Downloading ktx-release.aar..."
-            curl -L -s https://github.com/AkashPriyadarshii/tdlib-android/releases/download/v0.1.1/ktx-release.aar -o app/libs/ktx-release.aar
-          fi
-          ls -lh app/libs/
 
       - name: Run Unit Tests
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/keystore/collectflow.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'collectflow' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'collectflow' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'collectflow' }}
         run: |
           set -o pipefail
           ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee test_log.txt || {
-            echo "## ❌ Unit Tests Failed" >> $GITHUB_STEP_SUMMARY
+            echo "## Unit Tests Failed" >> $GITHUB_STEP_SUMMARY
             echo '```text' >> $GITHUB_STEP_SUMMARY
             tail -n 120 test_log.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            while IFS= read -r line; do
-              echo "::error::$line"
-            done < <(grep -E "(e: |error:|FAILED|FAILURE:)" test_log.txt | tail -n 25)
             exit 1
           }
 
       - name: Assemble Debug & Release APKs
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/keystore/collectflow.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'collectflow' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'collectflow' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'collectflow' }}
         run: |
           set -o pipefail
           ./gradlew assembleDebug assembleRelease --stacktrace 2>&1 | tee assemble_log.txt || {
-            echo "## ❌ Assemble APKs Failed" >> $GITHUB_STEP_SUMMARY
+            echo "## Assemble APKs Failed" >> $GITHUB_STEP_SUMMARY
             echo '```text' >> $GITHUB_STEP_SUMMARY
             tail -n 120 assemble_log.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            while IFS= read -r line; do
-              echo "::error::$line"
-            done < <(grep -E "(e: |error:|FAILED|FAILURE:)" assemble_log.txt | tail -n 25)
             exit 1
           }
 
@@ -98,15 +87,14 @@ jobs:
             test_log.txt
             assemble_log.txt
 
-      - name: Prepare APKs for Release
+      - name: Prepare APKs
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk CollectFlow-debug.apk
           cp app/build/outputs/apk/release/app-release.apk CollectFlow-release.apk
-          echo "### 📦 APK Sizes" >> $GITHUB_STEP_SUMMARY
           echo "| Build Type | Size |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| Debug (unminified) | $(du -h CollectFlow-debug.apk | cut -f1) |" >> $GITHUB_STEP_SUMMARY
-          echo "| Release (R8 minified) | $(du -h CollectFlow-release.apk | cut -f1) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Debug | $(du -h CollectFlow-debug.apk | cut -f1) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release | $(du -h CollectFlow-release.apk | cut -f1) |" >> $GITHUB_STEP_SUMMARY
           ls -lh CollectFlow-*.apk
 
       - name: Upload APK Artifacts
@@ -116,16 +104,17 @@ jobs:
           path: CollectFlow-*.apk
           retention-days: 30
 
-      - name: Publish to GitHub Releases (Direct One-Click Download)
+      - name: Publish rolling release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: "CollectFlow v1.0.0"
+          tag_name: latest
+          name: "CollectFlow (latest)"
+          make_latest: "true"
           body: |
-            ### 📱 Download for Android Phone
-            - **`CollectFlow-release.apk`**: R8-minified, optimized release build.
-            - **`CollectFlow-debug.apk`**: Debug build.
+            Latest build from `main`.
+            - **CollectFlow-release.apk**: optimized release build.
+            - **CollectFlow-debug.apk**: debug build.
           files: |
             CollectFlow-release.apk
             CollectFlow-debug.apk

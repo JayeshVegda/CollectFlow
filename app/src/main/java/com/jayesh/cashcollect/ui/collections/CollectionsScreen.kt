@@ -247,32 +247,34 @@ fun CollectionsScreen(
         ) {
             item {
                 GlassSurface(modifier = Modifier.fillMaxWidth()) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(18.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(horizontal = 18.dp, vertical = 16.dp)
                     ) {
-                        Column {
-                            Text("TODAY", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = NothingMuted, letterSpacing = 1.sp)
-                            Text(
-                                text = Paise(todayTotal).toFormattedRupees(),
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 26.sp,
-                                color = NothingWhite
-                            )
-                            Text("${todayCollected.size} collected", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingGray)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("COMMISSION", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = NothingMuted, letterSpacing = 1.sp)
-                            Text(
-                                text = Paise(todayCommission).toFormattedRupees(),
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp,
-                                color = NothingGreen
-                            )
+                        Text(
+                            text = "TODAY COLLECTED",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            color = NothingGray,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = Paise(todayTotal).toFormattedRupees(),
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 30.sp,
+                            color = NothingWhite
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Metric("COMMISSION", Paise(todayCommission).toFormattedRupees(), NothingGreen)
+                            Metric("COLLECTED", "${todayCollected.size}", NothingWhite)
+                            Metric("PENDING", "${pendingList.size}", NothingWhite)
+                            Metric("UNSENT", "${outstandingList.size}", NothingAmber)
                         }
                     }
                 }
@@ -470,6 +472,14 @@ private fun SectionLabel(text: String, color: Color) {
         color = color,
         modifier = Modifier.padding(top = 4.dp)
     )
+}
+
+@Composable
+private fun Metric(label: String, value: String, valueColor: Color) {
+    Column {
+        Text(label, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = NothingMuted, letterSpacing = 0.5.sp)
+        Text(value, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = valueColor)
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)

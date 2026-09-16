@@ -69,64 +69,85 @@ abstract class AppDatabase : RoomDatabase() {
         /**
          * Drops every Telegram/dispatch column introduced by the removed auto-send feature.
          *
-         * SQLite before 3.35 has no `DROP COLUMN`, so both tables are rebuilt instead: the data is
-         * copied across with INSERT...SELECT inside the migration transaction, so nothing is lost
-         * and Room's post-migration schema validation matches the current entities exactly.
+         * SQLite below 3.35 has no `DROP COLUMN`, so both tables are rebuilt instead. The rebuild
+         * is guarded by a PRAGMA column probe so the migration is safe to run against a database
+         * that was already rebuilt by a previous (possibly interrupted) attempt: re-running it is a
+         * no-op instead of an error. A failed migration would otherwise surface as a crash on the
+         * very first database access, which is exactly what this guard prevents.
          */
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    """
-                    CREATE TABLE settings_new (
-                        id INTEGER PRIMARY KEY NOT NULL,
-                        brother_whatsapp_number TEXT NOT NULL,
-                        commission_rate_per_thousand INTEGER NOT NULL,
-                        last_backup_at INTEGER,
-                        message_template TEXT NOT NULL
+                if (tableColumns(db, "settings").contains("telegram_enabled")) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS settings_new (
+                            id INTEGER PRIMARY KEY NOT NULL,
+                            brother_whatsapp_number TEXT NOT NULL,
+                            commission_rate_per_thousand INTEGER NOT NULL,
+                            last_backup_at INTEGER,
+                            message_template TEXT NOT NULL
+                        )
+                        """.trimIndent()
                     )
-                    """.trimIndent()
-                )
-                db.execSQL(
-                    "INSERT INTO settings_new (id, brother_whatsapp_number, commission_rate_per_thousand, last_backup_at, message_template) " +
-                        "SELECT id, brother_whatsapp_number, commission_rate_per_thousand, last_backup_at, message_template FROM settings"
-                )
-                db.execSQL("DROP TABLE settings")
-                db.execSQL("ALTER TABLE settings_new RENAME TO settings")
+                    db.execSQL(
+                        "INSERT OR REPLACE INTO settings_new (id, brother_whatsapp_number, commission_rate_per_thousand, last_backup_at, message_template) " +
+                            "SELECT id, brother_whatsapp_number, commission_rate_per_thousand, last_backup_at, message_template FROM settings"
+                    )
+                    db.execSQL("DROP TABLE settings")
+                    db.execSQL("ALTER TABLE settings_new RENAME TO settings")
+                }
 
-                db.execSQL(
-                    """
-                    CREATE TABLE collections_new (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        customer_id INTEGER NOT NULL,
-                        amount_paise INTEGER NOT NULL,
-                        commission_rate_snapshot INTEGER NOT NULL,
-                        commission_paise INTEGER NOT NULL,
-                        status TEXT NOT NULL,
-                        created_at INTEGER NOT NULL,
-                        received_at INTEGER,
-                        whatsapp_opened_at INTEGER,
-                        confirmed_sent_at INTEGER,
-                        voided_at INTEGER,
-                        void_reason TEXT,
-                        replaced_by_id INTEGER,
-                        replaces_id INTEGER,
-                        note TEXT,
-                        FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE RESTRICT
+                if (tableColumns(db, "collections").contains("last_dispatch_error")) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS collections_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            customer_id INTEGER NOT NULL,
+                            amount_paise INTEGER NOT NULL,
+                            commission_rate_snapshot INTEGER NOT NULL,
+                            commission_paise INTEGER NOT NULL,
+                            status TEXT NOT NULL,
+                            created_at INTEGER NOT NULL,
+                            received_at INTEGER,
+                            whatsapp_opened_at INTEGER,
+                            confirmed_sent_at INTEGER,
+                            voided_at INTEGER,
+                            void_reason TEXT,
+                            replaced_by_id INTEGER,
+                            replaces_id INTEGER,
+                            note TEXT,
+                            FOREIGN KEY(customer_id) REFERENCES customers(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+                        )
+                        """.trimIndent()
                     )
-                    """.trimIndent()
-                )
-                db.execSQL(
-                    "INSERT INTO collections_new (id, customer_id, amount_paise, commission_rate_snapshot, commission_paise, status, created_at, received_at, whatsapp_opened_at, confirmed_sent_at, voided_at, void_reason, replaced_by_id, replaces_id, note) " +
-                        "SELECT id, customer_id, amount_paise, commission_rate_snapshot, commission_paise, status, created_at, received_at, whatsapp_opened_at, confirmed_sent_at, voided_at, void_reason, replaced_by_id, replaces_id, note FROM collections"
-                )
-                db.execSQL("DROP TABLE collections")
-                db.execSQL("ALTER TABLE collections_new RENAME TO collections")
-                db.execSQL("CREATE INDEX index_collections_customer_id ON collections(customer_id)")
-                db.execSQL("CREATE INDEX index_collections_status ON collections(status)")
-                db.execSQL("CREATE INDEX index_collections_created_at ON collections(created_at)")
-                db.execSQL("CREATE INDEX index_collections_replaces_id ON collections(replaces_id)")
-                db.execSQL("CREATE INDEX index_collections_replaced_by_id ON collections(replaced_by_id)")
+                    db.execSQL(
+                        "INSERT OR REPLACE INTO collections_new (id, customer_id, amount_paise, commission_rate_snapshot, commission_paise, status, created_at, received_at, whatsapp_opened_at, confirmed_sent_at, voided_at, void_reason, replaced_by_id, replaces_id, note) " +
+                            "SELECT id, customer_id, amount_paise, commission_rate_snapshot, commission_paise, status, created_at, received_at, whatsapp_opened_at, confirmed_sent_at, voided_at, void_reason, replaced_by_id, replaces_id, note FROM collections"
+                    )
+                    db.execSQL("DROP TABLE collections")
+                    db.execSQL("ALTER TABLE collections_new RENAME TO collections")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_collections_customer_id ON collections(customer_id)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_collections_status ON collections(status)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_collections_created_at ON collections(created_at)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_collections_replaces_id ON collections(replaces_id)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_collections_replaced_by_id ON collections(replaced_by_id)")
+                }
             }
+        }
+
+        private fun tableColumns(db: SupportSQLiteDatabase, table: String): Set<String> {
+            val columns = mutableSetOf<String>()
+            runCatching {
+                db.query("PRAGMA table_info($table)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndex("name")
+                    if (nameIndex >= 0) {
+                        while (cursor.moveToNext()) {
+                            columns.add(cursor.getString(nameIndex))
+                        }
+                    }
+                }
+            }
+            return columns
         }
 
         fun getInstance(context: Context): AppDatabase {
@@ -136,7 +157,7 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         private fun buildDatabase(context: Context): AppDatabase {
-            backupBeforeMigrationIfNeeded(context)
+            runCatching { backupBeforeMigrationIfNeeded(context) }
             return Room.databaseBuilder(
                 context,
                 AppDatabase::class.java,
@@ -147,26 +168,23 @@ abstract class AppDatabase : RoomDatabase() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
                         CoroutineScope(Dispatchers.IO).launch {
-                            getInstance(context).settingsDao().insertOrUpdate(
-                                SettingsEntity(
-                                    id = 1L,
-                                    brotherWhatsAppNumber = "",
-                                    commissionRatePerThousand = 3,
-                                    lastBackupAt = null,
-                                    messageTemplate = MessageTemplateEngine.DEFAULT_TEMPLATE
+                            runCatching {
+                                getInstance(context).settingsDao().insertOrUpdate(
+                                    SettingsEntity(
+                                        id = 1L,
+                                        brotherWhatsAppNumber = "",
+                                        commissionRatePerThousand = 3,
+                                        lastBackupAt = null,
+                                        messageTemplate = MessageTemplateEngine.DEFAULT_TEMPLATE
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 })
                 .build()
         }
 
-        /**
-         * Copies the current database aside BEFORE Room opens a newer schema. If a future
-         * migration ever fails, the operator's data still exists in files/pre_update_backups.
-         * This is a hard guarantee that an app update cannot destroy financial records.
-         */
         private fun backupBeforeMigrationIfNeeded(context: Context) {
             val dbFile = context.getDatabasePath(DATABASE_NAME)
             if (!dbFile.exists()) return
