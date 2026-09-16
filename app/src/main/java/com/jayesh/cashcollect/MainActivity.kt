@@ -238,6 +238,7 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 NavigationBar(
                                     containerColor = NothingBlack,
+                                    tonalElevation = 0.dp,
                                     windowInsets = NavigationBarDefaults.windowInsets
                                 ) {
                                     NavItem(

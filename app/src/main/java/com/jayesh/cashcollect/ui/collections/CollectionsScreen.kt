@@ -486,11 +486,24 @@ private fun AttentionRow(text: String, onClick: () -> Unit) {
             .border(1.dp, NothingAmber, RoundedCornerShape(Radius.chip))
             .combinedClickable(onClick = onClick)
             .padding(horizontal = Space.sm, vertical = Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = text, style = AppType.labelMono, color = NothingAmber)
-        Text(text = "->", style = AppType.labelMono, color = NothingAmber)
+        // weight(1f) + maxLines = 2 so the label wraps instead of pushing the arrow off the
+        // right edge (it was being clipped at 11sp monospace tracking).
+        Text(
+            text = text,
+            style = AppType.labelMono,
+            color = NothingAmber,
+            modifier = Modifier.weight(1f),
+            maxLines = 2
+        )
+        Spacer(modifier = Modifier.width(Space.xs))
+        Text(
+            text = "->",
+            style = AppType.labelMono,
+            color = NothingAmber,
+            maxLines = 1
+        )
     }
 }
 

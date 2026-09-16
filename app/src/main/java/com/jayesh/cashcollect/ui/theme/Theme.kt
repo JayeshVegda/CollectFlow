@@ -18,6 +18,12 @@ private val NothingColorScheme = darkColorScheme(
     onTertiary = Color.Black,
     background = NothingBlack,
     onBackground = NothingWhite,
+    // Material 3 tints elevated surfaces with `surfaceTint`, which defaults to `primary`.
+    // With primary = NothingRed that blended a red wash over every elevated surface — most
+    // visibly a dark maroon band across the bottom navigation bar (3dp tonal elevation).
+    // The Nothing design system expresses depth with surface steps and 1px edges, never with
+    // accent-tinted elevation, so tonal tinting is disabled at the source.
+    surfaceTint = NothingBlack,
     surface = NothingBlack,
     onSurface = NothingWhite,
     surfaceVariant = NothingCard,
