@@ -38,6 +38,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -80,9 +81,9 @@ class CrashReportActivity : ComponentActivity() {
         val message = intent.getStringExtra(EXTRA_ERROR_MESSAGE) ?: "Unexpected runtime exception"
 
         setContent {
-            androidx.compose.runtime.CompositionLocalProvider(
-                androidx.lifecycle.compose.LocalLifecycleOwner provides this,
-                androidx.compose.ui.platform.LocalLifecycleOwner provides this
+            CompositionLocalProvider(
+                androidx.lifecycle.compose.LocalLifecycleOwner provides this@CrashReportActivity,
+                androidx.compose.ui.platform.LocalLifecycleOwner provides this@CrashReportActivity
             ) {
                 CrashScreen(
                     errorMessage = message,

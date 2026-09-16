@@ -59,6 +59,8 @@ jobs:
             echo '```text' >> $GITHUB_STEP_SUMMARY
             tail -n 120 test_log.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "=== TEST LOG FAILURE OUTPUT ==="
+            cat test_log.txt
             exit 1
           }
 
