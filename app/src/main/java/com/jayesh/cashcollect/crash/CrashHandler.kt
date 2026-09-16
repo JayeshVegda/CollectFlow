@@ -17,6 +17,19 @@ object CrashHandler {
     private const val CRASH_FILE = "latest_crash.txt"
 
     fun install(application: Application) {
+        val processName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            Application.getProcessName()
+        } else {
+            runCatching {
+                val pid = android.os.Process.myPid()
+                val am = application.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+                am?.runningAppProcesses?.find { it.pid == pid }?.processName
+            }.getOrNull()
+        }
+        if (processName?.endsWith(":crash") == true) {
+            return
+        }
+
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
 
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -36,6 +49,11 @@ object CrashHandler {
                     putExtra(CrashReportActivity.EXTRA_ERROR_MESSAGE, throwable.localizedMessage ?: throwable.javaClass.simpleName)
                 }
                 application.startActivity(intent)
+
+                // Brief pause to ensure ActivityManager dispatches the intent before killing process
+                try {
+                    Thread.sleep(350)
+                } catch (ignored: InterruptedException) {}
 
                 // Terminate crashed process safely
                 android.os.Process.killProcess(android.os.Process.myPid())

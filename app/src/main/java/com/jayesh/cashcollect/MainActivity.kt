@@ -406,7 +406,9 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    }
 }
+
 
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.NavItem(

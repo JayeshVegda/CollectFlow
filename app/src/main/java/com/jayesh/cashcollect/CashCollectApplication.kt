@@ -24,6 +24,11 @@ class CashCollectApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+
+        if (isCrashProcess()) {
+            return
+        }
+
         com.jayesh.cashcollect.crash.CrashHandler.install(this)
 
         database = AppDatabase.getInstance(this)
@@ -36,6 +41,19 @@ class CashCollectApplication : Application() {
 
         runCatching { UnconfirmedReminderWorker.schedule(this) }
             .onFailure { Log.e(TAG, "Failed to schedule periodic reminder worker", it) }
+    }
+
+    private fun isCrashProcess(): Boolean {
+        val processName = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            getProcessName()
+        } else {
+            runCatching {
+                val pid = android.os.Process.myPid()
+                val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+                am?.runningAppProcesses?.find { it.pid == pid }?.processName
+            }.getOrNull()
+        }
+        return processName?.endsWith(":crash") == true
     }
 
     companion object {
