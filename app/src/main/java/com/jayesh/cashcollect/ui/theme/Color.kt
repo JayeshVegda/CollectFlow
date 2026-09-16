@@ -37,3 +37,38 @@ val NothingGlassBorder = Color(0x2EFFFFFF)    // 1px glass edge (~18%)
 val NothingGlassHighlight = Color(0x24FFFFFF) // Top-left sheen (~14%)
 val NothingGlassTint = Color(0x08FFFFFF)      // Ultra-subtle wash (~3%)
 val NothingScrim = Color(0x99000000)          // Sheet backdrop dim
+
+// ---------------------------------------------------------------------------
+// Semantic layer
+// ---------------------------------------------------------------------------
+// Screens should reference these roles rather than raw hex, so the palette can be
+// tuned in one place. Contrast figures below are against the #000000 canvas.
+
+/** Page background. */
+val SurfaceBase = NothingBlack
+/** Default card / ledger row. */
+val SurfaceCard = NothingCard
+/** Raised card, pressed states, sheets. */
+val SurfaceRaised = NothingCardRaised
+/** Decorative divider only. Never the sole signal for a boundary. */
+val SurfaceDivider = NothingBorder
+/** Intentional edge — used sparingly, not on every card. */
+val SurfaceEdge = NothingBorderVisible
+
+/** Body text. #E8E8E8 on #000 = 16.5:1. */
+val TextPrimary = NothingTextPrimary
+/** Labels, captions, metadata. #999999 on #000 ≈ 7.4:1 — passes AA. */
+val TextSecondary = NothingGray
+/**
+ * Tertiary content that must still be *readable* (empty states, helper lines).
+ * #A1A1A1 on #000 ≈ 9:1.
+ *
+ * This exists because [NothingMuted] (#666666) measures ≈3.7:1 and therefore fails the
+ * 4.5:1 WCAG AA floor for body text — yet it was being used for real content such as the
+ * History empty state. Use this for anything a person has to read.
+ */
+val TextTertiary = Color(0xFFA1A1A1)
+/** Hero numbers and headlines. #FFFFFF on #000 = 21:1. */
+val TextDisplay = NothingWhite
+/** Disabled / decorative ONLY (~3.7:1, fails AA). Never readable content. */
+val TextDisabled = NothingMuted

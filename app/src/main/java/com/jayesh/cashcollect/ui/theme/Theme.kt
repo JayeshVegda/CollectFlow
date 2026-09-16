@@ -31,6 +31,7 @@ fun CashCollectTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = NothingColorScheme,
         typography = Typography,
+        shapes = AppShapes,
         content = content
     )
 }
