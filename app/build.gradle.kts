@@ -21,23 +21,32 @@ android {
         }
     }
 
+    val ksPath = System.getenv("KEYSTORE_PATH")
+        ?: rootProject.file("keystore/collectflow.jks").absolutePath
+    val ksFile = file(ksPath)
+    val hasReleaseKeystore = ksFile.exists()
+
     signingConfigs {
-        create("release") {
-            val ksPath = System.getenv("KEYSTORE_PATH")
-                ?: rootProject.file("keystore/collectflow.jks").absolutePath
-            storeFile = file(ksPath)
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-            keyAlias = System.getenv("KEY_ALIAS") ?: "collectflow"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: ""
-            enableV1Signing = true
-            enableV2Signing = true
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = ksFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "collectflow"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "collectflow"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "collectflow"
+                enableV1Signing = true
+                enableV2Signing = true
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -46,7 +55,11 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

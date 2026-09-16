@@ -32,6 +32,8 @@ data class InsightsSummary(
     val todayTotalPaise: Long,
     val todayCommissionPaise: Long,
     val todayCount: Int,
+    val todayPendingPaise: Long,
+    val todayPendingCount: Int,
     val weeklyTotalPaise: Long,
     val weeklyCommissionPaise: Long,
     val weeklyCount: Int,
@@ -48,7 +50,10 @@ data class InsightsSummary(
 object AnalyticsEngine {
 
     fun computeInsights(collections: List<CollectionItem>): InsightsSummary {
-        val validItems = collections.filter { it.status != CollectionStatus.VOIDED }
+        val realizedItems = collections.filter {
+            it.status == CollectionStatus.RECEIPT_CONFIRMED || it.status == CollectionStatus.CONFIRMED
+        }
+        val pendingItems = collections.filter { it.status == CollectionStatus.PENDING }
 
         val cal = Calendar.getInstance()
 
@@ -65,9 +70,14 @@ object AnalyticsEngine {
         cal.add(Calendar.DAY_OF_YEAR, -29)
         val startOf30Days = cal.timeInMillis
 
-        var todayTotal = 0L
-        var todayCommission = 0L
-        var todayCount = 0
+        val todayRealized = realizedItems.filter { (it.receivedAt ?: it.createdAt) >= startOfToday }
+        val todayTotal = todayRealized.sumOf { it.amountPaise }
+        val todayCommission = todayRealized.sumOf { it.commissionPaise }
+        val todayCount = todayRealized.size
+
+        val todayPending = pendingItems.filter { it.createdAt >= startOfToday }
+        val todayPendingPaise = todayPending.sumOf { it.amountPaise }
+        val todayPendingCount = todayPending.size
 
         var weeklyTotal = 0L
         var weeklyCommission = 0L
@@ -79,14 +89,8 @@ object AnalyticsEngine {
 
         val customerMap = mutableMapOf<String, CustomerVolume>()
 
-        for (item in validItems) {
+        for (item in realizedItems) {
             val itemTime = item.receivedAt ?: item.createdAt
-
-            if (itemTime >= startOfToday) {
-                todayTotal += item.amountPaise
-                todayCommission += item.commissionPaise
-                todayCount++
-            }
 
             if (itemTime >= startOf7Days) {
                 weeklyTotal += item.amountPaise
@@ -132,7 +136,7 @@ object AnalyticsEngine {
             val dayStart = loopCal.timeInMillis
             val dayEnd = dayStart + (24 * 60 * 60 * 1000L) - 1
 
-            val dayItems = validItems.filter {
+            val dayItems = realizedItems.filter {
                 val t = it.receivedAt ?: it.createdAt
                 t in dayStart..dayEnd
             }
@@ -171,7 +175,7 @@ object AnalyticsEngine {
             monthEndCal.set(Calendar.MILLISECOND, 999)
             val monthEnd = monthEndCal.timeInMillis
 
-            val monthItems = validItems.filter {
+            val monthItems = realizedItems.filter {
                 val t = it.receivedAt ?: it.createdAt
                 t in monthStart..monthEnd
             }
@@ -193,6 +197,8 @@ object AnalyticsEngine {
             todayTotalPaise = todayTotal,
             todayCommissionPaise = todayCommission,
             todayCount = todayCount,
+            todayPendingPaise = todayPendingPaise,
+            todayPendingCount = todayPendingCount,
             weeklyTotalPaise = weeklyTotal,
             weeklyCommissionPaise = weeklyCommission,
             weeklyCount = weeklyCount,

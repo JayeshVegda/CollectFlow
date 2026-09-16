@@ -21,6 +21,17 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import com.jayesh.cashcollect.domain.state.CollectionStatus
+import java.util.Calendar
+
+data class TodayStats(
+    val totalPaise: Long = 0L,
+    val commissionPaise: Long = 0L,
+    val count: Int = 0,
+    val pendingPaise: Long = 0L,
+    val pendingCount: Int = 0
+)
+
 class CollectViewModel(
     private val collectionRepo: CollectionRepository,
     private val customerRepo: CustomerRepository,
@@ -31,6 +42,31 @@ class CollectViewModel(
     companion object {
         private const val VOID_REASON_QUICK = "Quick swipe void (no reason given)"
     }
+
+    val todayStats: StateFlow<TodayStats> = collectionRepo.getAllHistory()
+        .map { list ->
+            val todayStart = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+            val todayRealized = list.filter {
+                (it.status == CollectionStatus.RECEIPT_CONFIRMED || it.status == CollectionStatus.CONFIRMED) &&
+                    (it.receivedAt ?: it.createdAt) >= todayStart
+            }
+            val todayPending = list.filter {
+                it.status == CollectionStatus.PENDING && it.createdAt >= todayStart
+            }
+
+            TodayStats(
+                totalPaise = todayRealized.sumOf { it.amountPaise },
+                commissionPaise = todayRealized.sumOf { it.commissionPaise },
+                count = todayRealized.size,
+                pendingPaise = todayPending.sumOf { it.amountPaise },
+                pendingCount = todayPending.size
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TodayStats())
 
     val outstandingList: StateFlow<List<CollectionItem>> = collectionRepo.getOutstandingConfirmations()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

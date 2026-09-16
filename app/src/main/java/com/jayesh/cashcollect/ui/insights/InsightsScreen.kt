@@ -41,6 +41,7 @@ import com.jayesh.cashcollect.ui.common.GlassMetricRow
 import com.jayesh.cashcollect.ui.common.GlassSurface
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
+import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingGray
 import com.jayesh.cashcollect.ui.theme.NothingGreen
@@ -85,14 +86,38 @@ fun InsightsScreen(
             item {
                 GlassSurface(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = "TODAY",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            letterSpacing = 1.sp,
-                            color = NothingGray
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "TODAY REALIZED",
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                letterSpacing = 1.sp,
+                                color = NothingGray
+                            )
+                            if (insights.todayPendingCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .border(1.dp, NothingBorderVisible, RoundedCornerShape(999.dp))
+                                        .background(Color(0x1AFFFFFF))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "${Paise(insights.todayPendingPaise).toFormattedRupees()} PENDING",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = NothingGray,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+                        }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = Paise(insights.todayTotalPaise).toFormattedRupees(),

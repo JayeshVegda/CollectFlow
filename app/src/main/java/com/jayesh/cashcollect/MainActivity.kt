@@ -204,7 +204,8 @@ class MainActivity : ComponentActivity() {
 
                 val historyList by historyViewModel.historyList.collectAsStateWithLifecycle()
                 val appSettings by settingsViewModel.settings.collectAsStateWithLifecycle()
-                val recentCustomers by app.customerRepository.getRecentCustomers(10).collectAsStateWithLifecycle(initialValue = emptyList())
+                val recentCustomersFlow = remember(app) { app.customerRepository.getRecentCustomers(10) }
+                val recentCustomers by recentCustomersFlow.collectAsStateWithLifecycle(initialValue = emptyList())
                 val customerSearchResults = remember { MutableStateFlow<List<Customer>>(emptyList()) }
                 val searchResultsState by customerSearchResults.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()

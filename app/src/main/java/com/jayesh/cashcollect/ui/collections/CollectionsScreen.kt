@@ -98,11 +98,13 @@ fun CollectRoute(
     onSettingsClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val todayStats by viewModel.todayStats.collectAsStateWithLifecycle()
     val outstandingList by viewModel.outstandingList.collectAsStateWithLifecycle()
     val pendingList by viewModel.pendingList.collectAsStateWithLifecycle()
     val commissionRate by viewModel.commissionRate.collectAsStateWithLifecycle()
 
     CollectionsScreen(
+        todayStats = todayStats,
         outstandingList = outstandingList,
         pendingList = pendingList,
         commissionRatePerThousand = commissionRate,
@@ -125,6 +127,7 @@ fun CollectRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollectionsScreen(
+    todayStats: TodayStats = TodayStats(),
     outstandingList: List<CollectionItem>,
     pendingList: List<CollectionItem>,
     commissionRatePerThousand: Int,
@@ -175,19 +178,11 @@ fun CollectionsScreen(
     BackHandler(enabled = selectedItemForConfirm != null) { selectedItemForConfirm = null }
     BackHandler(enabled = itemToEdit != null) { itemToEdit = null }
 
-    val todayStart = remember {
-        Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-    }
-    val allActive = (pendingList + outstandingList)
-    val todayCollected = allActive.filter {
-        (it.status == CollectionStatus.RECEIPT_CONFIRMED || it.status == CollectionStatus.CONFIRMED) &&
-            (it.receivedAt ?: it.createdAt) >= todayStart
-    }
-    val todayTotal = todayCollected.sumOf { it.amountPaise }
-    val todayCommission = todayCollected.sumOf { it.commissionPaise }
+    val todayTotal = todayStats.totalPaise
+    val todayCommission = todayStats.commissionPaise
+    val todayCollectedCount = todayStats.count
+    val todayPendingPaise = todayStats.pendingPaise
+    val todayPendingCount = todayStats.pendingCount
 
     Scaffold(
         containerColor = NothingBlack,
@@ -252,27 +247,52 @@ fun CollectionsScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 18.dp, vertical = 16.dp)
                     ) {
-                        Text(
-                            text = "TODAY COLLECTED",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            color = NothingGray,
-                            letterSpacing = 1.sp
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "TODAY COLLECTED",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                color = NothingGray,
+                                letterSpacing = 1.sp
+                            )
+                            if (todayPendingCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .border(1.dp, NothingBorderVisible, RoundedCornerShape(999.dp))
+                                        .background(Color(0x1AFFFFFF))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "${Paise(todayPendingPaise).toFormattedRupees()} PENDING",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = NothingGray,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = Paise(todayTotal).toFormattedRupees(),
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 30.sp,
+                            fontSize = 32.sp,
                             color = NothingWhite
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Metric("COMMISSION", Paise(todayCommission).toFormattedRupees(), NothingGreen)
-                            Metric("COLLECTED", "${todayCollected.size}", NothingWhite)
+                            Metric("COLLECTED", "$todayCollectedCount", NothingWhite)
                             Metric("PENDING", "${pendingList.size}", NothingWhite)
                             Metric("UNSENT", "${outstandingList.size}", NothingAmber)
                         }
