@@ -23,26 +23,28 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,21 +57,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
+import com.jayesh.cashcollect.domain.state.CollectionStatus
 import com.jayesh.cashcollect.ui.common.ConfirmBottomSheet
+import com.jayesh.cashcollect.ui.common.EditCollectionBottomSheet
+import com.jayesh.cashcollect.ui.common.GlassSurface
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingAmberBg
 import com.jayesh.cashcollect.ui.theme.NothingAmberBorder
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
 import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
-import com.jayesh.cashcollect.ui.theme.NothingCard
 import com.jayesh.cashcollect.ui.theme.NothingCardRaised
+import com.jayesh.cashcollect.ui.theme.NothingGlassBorder
 import com.jayesh.cashcollect.ui.theme.NothingGray
 import com.jayesh.cashcollect.ui.theme.NothingGreen
 import com.jayesh.cashcollect.ui.theme.NothingMuted
@@ -77,17 +84,9 @@ import com.jayesh.cashcollect.ui.theme.NothingRed
 import com.jayesh.cashcollect.ui.theme.NothingWhite
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberSwipeToDismissBoxState
-import com.jayesh.cashcollect.ui.common.EditCollectionBottomSheet
 
 @Composable
 fun CollectRoute(
@@ -118,10 +117,8 @@ fun CollectRoute(
         onDeleteCollection = { id -> viewModel.deleteCollection(context, id) },
         onUpdateCollection = { id, amt, note -> viewModel.updateCollection(context, id, amt, note) },
         onVoidInstantly = { item -> viewModel.voidInstantly(context, item) },
-        onRetryTelegram = { item -> viewModel.retryTelegram(context, item) },
         onBulkReceiveAndSend = { items -> viewModel.receiveAndSendAll(context, items) },
-        onBulkMarkSent = { items -> viewModel.markAllSent(context, items) },
-        onSettingsClick = onSettingsClick
+        onBulkMarkSent = { items -> viewModel.markAllSent(context, items) }
     )
 }
 
@@ -142,18 +139,14 @@ fun CollectionsScreen(
     onDeleteCollection: (Long) -> Unit,
     onUpdateCollection: (Long, Long, String?) -> Unit,
     onVoidInstantly: (CollectionItem) -> Unit = {},
-    onRetryTelegram: (CollectionItem) -> Unit = {},
     onBulkReceiveAndSend: (List<CollectionItem>) -> Unit = {},
-    onBulkMarkSent: (List<CollectionItem>) -> Unit = {},
-    onSettingsClick: () -> Unit
+    onBulkMarkSent: (List<CollectionItem>) -> Unit = {}
 ) {
     var isQuickCaptureOpen by remember { mutableStateOf(initialOpenQuickCapture) }
     val quickCaptureSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(initialOpenQuickCapture) {
-        if (initialOpenQuickCapture) {
-            isQuickCaptureOpen = true
-        }
+        if (initialOpenQuickCapture) isQuickCaptureOpen = true
     }
 
     var selectedItemForConfirm by remember { mutableStateOf<CollectionItem?>(null) }
@@ -164,11 +157,9 @@ fun CollectionsScreen(
 
     var itemToDelete by remember { mutableStateOf<CollectionItem?>(null) }
 
-    // Multi-select: long-press a row to select several entries and act on them at once.
     var selectionMode by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<Long>() }
 
-    // Drop selections whose entries no longer exist (e.g. after a bulk receive).
     LaunchedEffect(pendingList, outstandingList) {
         val stillPresent = (pendingList + outstandingList).map { it.id }.toSet()
         selectedIds.removeAll { it !in stillPresent }
@@ -177,19 +168,26 @@ fun CollectionsScreen(
 
     val scope = rememberCoroutineScope()
 
-    // BackHandler ensures pressing Back closes sheets cleanly without exiting or triggering navigation loops
     BackHandler(enabled = isQuickCaptureOpen) {
         isQuickCaptureOpen = false
         onQuickCaptureDismissed()
     }
+    BackHandler(enabled = selectedItemForConfirm != null) { selectedItemForConfirm = null }
+    BackHandler(enabled = itemToEdit != null) { itemToEdit = null }
 
-    BackHandler(enabled = selectedItemForConfirm != null) {
-        selectedItemForConfirm = null
+    val todayStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
-
-    BackHandler(enabled = itemToEdit != null) {
-        itemToEdit = null
+    val allActive = (pendingList + outstandingList)
+    val todayCollected = allActive.filter {
+        (it.status == CollectionStatus.RECEIPT_CONFIRMED || it.status == CollectionStatus.CONFIRMED) &&
+            (it.receivedAt ?: it.createdAt) >= todayStart
     }
+    val todayTotal = todayCollected.sumOf { it.amountPaise }
+    val todayCommission = todayCollected.sumOf { it.commissionPaise }
 
     Scaffold(
         containerColor = NothingBlack,
@@ -215,9 +213,7 @@ fun CollectionsScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = NothingBlack
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = NothingBlack)
             )
         },
         floatingActionButton = {
@@ -228,12 +224,7 @@ fun CollectionsScreen(
                 shape = RoundedCornerShape(999.dp),
                 modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(999.dp))
             ) {
-                Icon(
-                    Icons.Default.FlashOn,
-                    contentDescription = null,
-                    tint = NothingRed,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Default.FlashOn, contentDescription = null, tint = NothingRed, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "QUICK CAPTURE",
@@ -252,8 +243,40 @@ fun CollectionsScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            item {
+                GlassSurface(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("TODAY", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = NothingMuted, letterSpacing = 1.sp)
+                            Text(
+                                text = Paise(todayTotal).toFormattedRupees(),
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 26.sp,
+                                color = NothingWhite
+                            )
+                            Text("${todayCollected.size} collected", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingGray)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("COMMISSION", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = NothingMuted, letterSpacing = 1.sp)
+                            Text(
+                                text = Paise(todayCommission).toFormattedRupees(),
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = NothingGreen
+                            )
+                        }
+                    }
+                }
+            }
 
             if (selectionMode) {
                 item {
@@ -262,38 +285,22 @@ fun CollectionsScreen(
                         pendingCount = pendingList.count { it.id in selectedIds },
                         outstandingCount = outstandingList.count { it.id in selectedIds },
                         onReceiveAndSend = {
-                            val items = pendingList.filter { it.id in selectedIds }
-                            onBulkReceiveAndSend(items)
-                            selectedIds.clear()
-                            selectionMode = false
+                            onBulkReceiveAndSend(pendingList.filter { it.id in selectedIds })
+                            selectedIds.clear(); selectionMode = false
                         },
                         onMarkSent = {
-                            val items = outstandingList.filter { it.id in selectedIds }
-                            onBulkMarkSent(items)
-                            selectedIds.clear()
-                            selectionMode = false
+                            onBulkMarkSent(outstandingList.filter { it.id in selectedIds })
+                            selectedIds.clear(); selectionMode = false
                         },
-                        onClear = {
-                            selectedIds.clear()
-                            selectionMode = false
-                        }
+                        onClear = { selectedIds.clear(); selectionMode = false }
                     )
                 }
             }
 
-            // 2. OUTSTANDING CONFIRMATIONS (Warning Amber)
             if (outstandingList.isNotEmpty()) {
                 item {
-                    Text(
-                        text = "OUTSTANDING CONFIRMATIONS (${outstandingList.size})",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        letterSpacing = 1.sp,
-                        color = NothingAmber
-                    )
+                    SectionLabel("OUTSTANDING (${outstandingList.size})", NothingAmber)
                 }
-
                 items(outstandingList, key = { it.id }) { item ->
                     OutstandingRow(
                         item = item,
@@ -301,43 +308,30 @@ fun CollectionsScreen(
                         onClick = {
                             if (selectionMode) {
                                 if (item.id in selectedIds) selectedIds.remove(item.id) else selectedIds.add(item.id)
-                            } else {
-                                onCollectionClick(item.id)
-                            }
+                            } else onCollectionClick(item.id)
                         },
                         onLongClick = {
                             selectionMode = true
                             if (item.id !in selectedIds) selectedIds.add(item.id)
                         },
                         onOpenWhatsAppAgain = { onOpenWhatsAppAgain(item) },
-                        onConfirmSent = { onConfirmSent(item.id) },
-                        onRetryTelegram = { onRetryTelegram(item) }
+                        onConfirmSent = { onConfirmSent(item.id) }
                     )
                 }
             }
 
-            // 3. PENDING COLLECTIONS
             item {
-                Text(
-                    text = "PENDING COLLECTIONS (${pendingList.size})",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    letterSpacing = 1.sp,
-                    color = NothingGray
-                )
+                SectionLabel("PENDING (${pendingList.size})", NothingGray)
             }
 
             if (pendingList.isEmpty() && outstandingList.isEmpty()) {
                 item {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 48.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No pending collections.\nTap \"+ QUICK CAPTURE\" to add.",
+                            text = "No pending collections.\nTap \"QUICK CAPTURE\" to add.",
                             fontFamily = FontFamily.Monospace,
                             color = NothingMuted,
                             fontSize = 13.sp,
@@ -353,9 +347,7 @@ fun CollectionsScreen(
                         onClick = {
                             if (selectionMode) {
                                 if (item.id in selectedIds) selectedIds.remove(item.id) else selectedIds.add(item.id)
-                            } else {
-                                onCollectionClick(item.id)
-                            }
+                            } else onCollectionClick(item.id)
                         },
                         onLongClick = {
                             selectionMode = true
@@ -370,7 +362,6 @@ fun CollectionsScreen(
         }
     }
 
-    // Quick Capture Popup BottomSheet
     if (isQuickCaptureOpen) {
         QuickCaptureBottomSheet(
             sheetState = quickCaptureSheetState,
@@ -392,15 +383,12 @@ fun CollectionsScreen(
         )
     }
 
-    // Confirmation Bottom Sheet before committing & launching WhatsApp / Telegram
     selectedItemForConfirm?.let { item ->
         ConfirmBottomSheet(
             collection = item,
             sheetState = confirmSheetState,
             onDismiss = {
-                scope.launch { confirmSheetState.hide() }.invokeOnCompletion {
-                    selectedItemForConfirm = null
-                }
+                scope.launch { confirmSheetState.hide() }.invokeOnCompletion { selectedItemForConfirm = null }
             },
             onConfirmReceiveAndWhatsApp = {
                 scope.launch { confirmSheetState.hide() }.invokeOnCompletion {
@@ -412,15 +400,12 @@ fun CollectionsScreen(
         )
     }
 
-    // Edit Bottom Sheet
     itemToEdit?.let { item ->
         EditCollectionBottomSheet(
             collection = item,
             sheetState = editSheetState,
             onDismiss = {
-                scope.launch { editSheetState.hide() }.invokeOnCompletion {
-                    itemToEdit = null
-                }
+                scope.launch { editSheetState.hide() }.invokeOnCompletion { itemToEdit = null }
             },
             onSave = { amountPaise, note ->
                 scope.launch { editSheetState.hide() }.invokeOnCompletion {
@@ -439,24 +424,16 @@ fun CollectionsScreen(
         )
     }
 
-    // Delete Confirmation Dialog
     itemToDelete?.let { item ->
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
             containerColor = NothingCardRaised,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
-            title = {
-                Text(
-                    text = "DELETE ENTRY?",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = NothingWhite
-                )
-            },
+            title = { Text("DELETE ENTRY?", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = NothingWhite) },
             text = {
                 Text(
-                    text = "Are you sure you want to delete collection of ${Paise(item.amountPaise).toFormattedRupees()} for ${item.customerDisplayName}?",
+                    text = "Delete collection of ${Paise(item.amountPaise).toFormattedRupees()} for ${item.customerDisplayName}?",
                     color = NothingGray
                 )
             },
@@ -482,6 +459,19 @@ fun CollectionsScreen(
     }
 }
 
+@Composable
+private fun SectionLabel(text: String, color: Color) {
+    Text(
+        text = text,
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp,
+        letterSpacing = 1.sp,
+        color = color,
+        modifier = Modifier.padding(top = 4.dp)
+    )
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun OutstandingRow(
@@ -490,21 +480,19 @@ private fun OutstandingRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onOpenWhatsAppAgain: () -> Unit,
-    onConfirmSent: () -> Unit,
-    onRetryTelegram: () -> Unit
+    onConfirmSent: () -> Unit
 ) {
-    val dispatchError = item.lastDispatchError?.takeIf { it.isNotBlank() }
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(NothingAmberBg)
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
                 color = if (isSelected) NothingRed else NothingAmberBorder,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(16.dp)
             )
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        colors = CardDefaults.cardColors(containerColor = NothingAmberBg),
-        shape = RoundedCornerShape(14.dp)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -513,16 +501,15 @@ private fun OutstandingRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "⚠️ CASH RECEIVED (UNSENT)",
+                    text = "CASH RECEIVED · UNSENT",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     letterSpacing = 0.5.sp,
                     color = NothingAmber
                 )
-                val timeAgo = formatTimeAgo(item.receivedAt ?: item.createdAt)
                 Text(
-                    text = timeAgo,
+                    text = formatTimeAgo(item.receivedAt ?: item.createdAt),
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
                     color = NothingGray
@@ -537,12 +524,7 @@ private fun OutstandingRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        text = item.customerDisplayName,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        color = NothingWhite
-                    )
+                    Text(item.customerDisplayName, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = NothingWhite)
                     Text(
                         text = "Comm: ${Paise(item.commissionPaise).toFormattedRupees()}",
                         fontFamily = FontFamily.Monospace,
@@ -550,12 +532,7 @@ private fun OutstandingRow(
                         color = NothingGray
                     )
                     if (!item.note.isNullOrBlank()) {
-                        Text(
-                            text = "Note: ${item.note}",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = NothingMuted
-                        )
+                        Text("Note: ${item.note}", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingMuted)
                     }
                 }
                 Text(
@@ -569,22 +546,7 @@ private fun OutstandingRow(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Telegram dispatch failure is never silent: show the real reason + a retry.
-            if (dispatchError != null) {
-                Text(
-                    text = "TELEGRAM FAILED: $dispatchError",
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    color = NothingRed,
-                    lineHeight = 14.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = onOpenWhatsAppAgain,
                     modifier = Modifier.weight(1f).height(40.dp),
@@ -593,22 +555,8 @@ private fun OutstandingRow(
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("OPEN WHATSAPP", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
+                    Text("OPEN WA", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
                 }
-
-                if (dispatchError != null) {
-                    OutlinedButton(
-                        onClick = onRetryTelegram,
-                        modifier = Modifier.weight(1f).height(40.dp),
-                        shape = RoundedCornerShape(999.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, NothingBorderVisible)
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, tint = NothingAmber, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("RETRY", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingAmber)
-                    }
-                }
-
                 Button(
                     onClick = onConfirmSent,
                     modifier = Modifier.weight(1f).height(40.dp),
@@ -637,21 +585,16 @@ private fun SwipeablePendingRow(
 ) {
     val dismissState = rememberSwipeToDismissBoxState()
 
-    // Instant actions: swipe right = receive + dispatch (no sheet), swipe left = instant void.
-    // Resetting the state afterwards is the supported Material3 pattern (actions must never be
-    // fired from confirmValueChange).
     LaunchedEffect(dismissState.currentValue) {
         when (dismissState.currentValue) {
             SwipeToDismissBoxValue.StartToEnd -> {
                 dismissState.reset()
                 onReceiveAction()
             }
-
             SwipeToDismissBoxValue.EndToStart -> {
                 dismissState.reset()
                 onVoidAction()
             }
-
             SwipeToDismissBoxValue.Settled -> Unit
         }
     }
@@ -675,7 +618,7 @@ private fun SwipeablePendingRow(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(color)
                     .padding(horizontal = 20.dp),
                 contentAlignment = alignment
@@ -684,23 +627,11 @@ private fun SwipeablePendingRow(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "RECEIVE & SEND",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = Color.Black
-                        )
+                        Text("RECEIVE & SEND", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black)
                     }
                 } else if (direction == SwipeToDismissBoxValue.EndToStart) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "DELETE / VOID",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = NothingWhite
-                        )
+                        Text("VOID", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = NothingWhite)
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(Icons.Default.Delete, contentDescription = null, tint = NothingWhite)
                     }
@@ -729,32 +660,25 @@ private fun PendingRow(
     onReceiveClick: () -> Unit,
     onEditClick: () -> Unit
 ) {
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF101010))
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) NothingRed else NothingBorderVisible,
-                shape = RoundedCornerShape(14.dp)
+                color = if (isSelected) NothingRed else NothingGlassBorder,
+                shape = RoundedCornerShape(16.dp)
             )
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        colors = CardDefaults.cardColors(containerColor = NothingCard),
-        shape = RoundedCornerShape(14.dp)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.customerDisplayName,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = NothingWhite
-                )
+                Text(item.customerDisplayName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = NothingWhite)
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = Paise(item.amountPaise).toFormattedRupees(),
@@ -770,37 +694,17 @@ private fun PendingRow(
                     color = NothingGray
                 )
                 if (!item.note.isNullOrBlank()) {
-                    Text(
-                        text = "Note: ${item.note}",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        color = NothingMuted
-                    )
+                    Text("Note: ${item.note}", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingMuted)
                 }
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(
-                    onClick = onEditClick,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Edit",
-                        tint = NothingGray,
-                        modifier = Modifier.size(18.dp)
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = onEditClick, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = NothingGray, modifier = Modifier.size(18.dp))
                 }
-
                 Button(
                     onClick = onReceiveClick,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = NothingWhite,
-                        contentColor = Color.Black
-                    ),
+                    colors = ButtonDefaults.buttonColors(containerColor = NothingWhite, contentColor = Color.Black),
                     shape = RoundedCornerShape(999.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
@@ -827,34 +731,24 @@ private fun BulkActionBar(
     onMarkSent: () -> Unit,
     onClear: () -> Unit
 ) {
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, NothingRed, RoundedCornerShape(14.dp)),
-        colors = CardDefaults.cardColors(containerColor = NothingCardRaised),
-        shape = RoundedCornerShape(14.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF141414))
+            .border(1.dp, NothingRed, RoundedCornerShape(16.dp))
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "$selectedCount SELECTED",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = NothingWhite
-                )
+                Text("$selectedCount SELECTED", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = NothingWhite)
                 TextButton(onClick = onClear) {
                     Text("CANCEL", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingGray)
                 }
             }
-
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (pendingCount > 0) {
                     Button(
@@ -863,15 +757,7 @@ private fun BulkActionBar(
                         colors = ButtonDefaults.buttonColors(containerColor = NothingWhite),
                         shape = RoundedCornerShape(999.dp)
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "RECEIVE & SEND ($pendingCount)",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp,
-                            color = Color.Black
-                        )
+                        Text("RECEIVE ($pendingCount)", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.Black)
                     }
                 }
                 if (outstandingCount > 0) {
@@ -881,15 +767,7 @@ private fun BulkActionBar(
                         colors = ButtonDefaults.buttonColors(containerColor = NothingGreen),
                         shape = RoundedCornerShape(999.dp)
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "MARK SENT ($outstandingCount)",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp,
-                            color = Color.Black
-                        )
+                        Text("MARK SENT ($outstandingCount)", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.Black)
                     }
                 }
             }

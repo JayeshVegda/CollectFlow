@@ -71,8 +71,6 @@ class EncryptedBackupManager(
                     put("replaced_by_id", c.replacedById ?: JSONObject.NULL)
                     put("replaces_id", c.replacesId ?: JSONObject.NULL)
                     put("note", c.note ?: JSONObject.NULL)
-                    put("last_dispatch_error", c.lastDispatchError ?: JSONObject.NULL)
-                    put("last_dispatch_attempt_at", c.lastDispatchAttemptAt ?: JSONObject.NULL)
                 })
             }
             put("collections", collectionsArray)
@@ -83,11 +81,6 @@ class EncryptedBackupManager(
                     put("commission_rate_per_thousand", settings.commissionRatePerThousand)
                     put("last_backup_at", settings.lastBackupAt ?: JSONObject.NULL)
                     put("message_template", settings.messageTemplate)
-                    put("telegram_enabled", settings.telegramEnabled)
-                    put("telegram_api_id", settings.telegramApiId)
-                    put("telegram_api_hash", settings.telegramApiHash)
-                    put("telegram_recipient", settings.telegramRecipient)
-                    put("telegram_fallback_whatsapp", settings.telegramFallbackWhatsApp)
                 })
             }
         }
@@ -174,9 +167,7 @@ class EncryptedBackupManager(
                         voidReason = if (obj.isNull("void_reason")) null else obj.getString("void_reason"),
                         replacedById = if (obj.isNull("replaced_by_id")) null else obj.getLong("replaced_by_id"),
                         replacesId = if (obj.isNull("replaces_id")) null else obj.getLong("replaces_id"),
-                        note = if (obj.isNull("note")) null else obj.getString("note"),
-                        lastDispatchError = if (obj.isNull("last_dispatch_error")) null else obj.getString("last_dispatch_error"),
-                        lastDispatchAttemptAt = if (obj.isNull("last_dispatch_attempt_at")) null else obj.getLong("last_dispatch_attempt_at")
+                        note = if (obj.isNull("note")) null else obj.getString("note")
                     )
                 )
             }
@@ -197,12 +188,7 @@ class EncryptedBackupManager(
                             brotherWhatsAppNumber = settingsObj.optString("brother_whatsapp_number", ""),
                             commissionRatePerThousand = settingsObj.optInt("commission_rate_per_thousand", 3),
                             lastBackupAt = System.currentTimeMillis(),
-                            messageTemplate = settingsObj.optString("message_template", MessageTemplateEngine.DEFAULT_TEMPLATE),
-                            telegramEnabled = settingsObj.optBoolean("telegram_enabled", false),
-                            telegramApiId = settingsObj.optString("telegram_api_id", ""),
-                            telegramApiHash = settingsObj.optString("telegram_api_hash", ""),
-                            telegramRecipient = settingsObj.optString("telegram_recipient", ""),
-                            telegramFallbackWhatsApp = settingsObj.optBoolean("telegram_fallback_whatsapp", true)
+                            messageTemplate = settingsObj.optString("message_template", MessageTemplateEngine.DEFAULT_TEMPLATE)
                         )
                     )
                 }

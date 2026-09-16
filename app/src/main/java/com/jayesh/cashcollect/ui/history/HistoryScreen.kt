@@ -1,5 +1,6 @@
 package com.jayesh.cashcollect.ui.history
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -19,12 +20,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -38,26 +36,26 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
 import com.jayesh.cashcollect.domain.state.CollectionStatus
+import com.jayesh.cashcollect.ui.common.GlassSurface
 import com.jayesh.cashcollect.ui.common.StatusBadge
 import com.jayesh.cashcollect.ui.theme.NothingBlack
-import com.jayesh.cashcollect.ui.theme.NothingBorder
 import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
-import com.jayesh.cashcollect.ui.theme.NothingCardRaised
+import com.jayesh.cashcollect.ui.theme.NothingGlassBorder
 import com.jayesh.cashcollect.ui.theme.NothingGray
 import com.jayesh.cashcollect.ui.theme.NothingMuted
 import com.jayesh.cashcollect.ui.theme.NothingRed
@@ -75,6 +73,7 @@ fun HistoryRoute(
     val items by viewModel.filteredItems.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedStatus by viewModel.selectedStatus.collectAsStateWithLifecycle()
+    val sortOption by viewModel.sortOption.collectAsStateWithLifecycle()
 
     HistoryScreen(
         items = items,
@@ -82,6 +81,8 @@ fun HistoryRoute(
         onSearchQueryChange = viewModel::onSearchQueryChange,
         selectedStatus = selectedStatus,
         onStatusSelect = viewModel::onStatusSelect,
+        sortOption = sortOption,
+        onToggleSort = viewModel::toggleSort,
         onItemClick = onItemClick,
         onExportCsvClick = { viewModel.exportCsv(context) }
     )
@@ -95,6 +96,8 @@ fun HistoryScreen(
     onSearchQueryChange: (String) -> Unit = {},
     selectedStatus: CollectionStatus? = null,
     onStatusSelect: (CollectionStatus?) -> Unit = {},
+    sortOption: SortOption = SortOption.NEWEST,
+    onToggleSort: () -> Unit = {},
     onItemClick: (Long) -> Unit,
     onExportCsvClick: () -> Unit
 ) {
@@ -113,6 +116,9 @@ fun HistoryScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = onToggleSort) {
+                        Icon(Icons.Default.SwapVert, contentDescription = "Sort", tint = NothingWhite)
+                    }
                     IconButton(onClick = onExportCsvClick) {
                         Icon(Icons.Default.FileDownload, contentDescription = "Export CSV", tint = NothingWhite)
                     }
@@ -129,7 +135,6 @@ fun HistoryScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchQueryChange,
@@ -147,7 +152,6 @@ fun HistoryScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Filter Chips
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -175,9 +179,7 @@ fun HistoryScreen(
                 CollectionStatus.values().forEach { status ->
                     FilterChip(
                         selected = selectedStatus == status,
-                        onClick = {
-                            onStatusSelect(if (selectedStatus == status) null else status)
-                        },
+                        onClick = { onStatusSelect(if (selectedStatus == status) null else status) },
                         label = { Text(status.name, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = NothingCard,
@@ -195,13 +197,29 @@ fun HistoryScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${items.size} records",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = NothingMuted
+                )
+                Text(
+                    text = sortOption.label,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = NothingGray,
+                    modifier = Modifier.clickable { onToggleSort() }
+                )
+            }
 
             if (items.isEmpty()) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 48.dp),
+                    modifier = Modifier.fillMaxSize().padding(top = 48.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("No records match your filters.", fontFamily = FontFamily.Monospace, color = NothingMuted)
@@ -209,7 +227,7 @@ fun HistoryScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 72.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 72.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(items, key = { it.id }) { item ->
@@ -226,13 +244,11 @@ private fun HistoryRow(item: CollectionItem, onClick: () -> Unit) {
     val isVoided = item.status == CollectionStatus.VOIDED
     val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
 
-    Card(
+    GlassSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, NothingBorder, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = NothingCard),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(14.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -275,17 +291,13 @@ private fun HistoryRow(item: CollectionItem, onClick: () -> Unit) {
 
             if (!item.note.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Note: ${item.note}",
-                    fontSize = 12.sp,
-                    color = NothingGray
-                )
+                Text("Note: ${item.note}", fontSize = 12.sp, color = NothingGray)
             }
 
             if (isVoided && !item.voidReason.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Void Reason: ${item.voidReason}",
+                    text = "Void: ${item.voidReason}",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
                     color = NothingRed

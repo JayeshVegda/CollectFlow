@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -37,13 +35,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jayesh.cashcollect.domain.analytics.AnalyticsEngine
 import com.jayesh.cashcollect.domain.analytics.DailyTrendBucket
+import com.jayesh.cashcollect.domain.analytics.MonthlyBucket
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
+import com.jayesh.cashcollect.ui.common.GlassSurface
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
-import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
-import com.jayesh.cashcollect.ui.theme.NothingCardRaised
+import com.jayesh.cashcollect.ui.theme.NothingGlass
+import com.jayesh.cashcollect.ui.theme.NothingGlassBorder
 import com.jayesh.cashcollect.ui.theme.NothingGray
 import com.jayesh.cashcollect.ui.theme.NothingGreen
 import com.jayesh.cashcollect.ui.theme.NothingMuted
@@ -64,7 +64,7 @@ fun InsightsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "INSIGHTS & ANALYTICS",
+                        text = "INSIGHTS",
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp,
@@ -72,9 +72,7 @@ fun InsightsScreen(
                         color = NothingWhite
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = NothingBlack
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = NothingBlack)
             )
         }
     ) { paddingValues ->
@@ -84,17 +82,10 @@ fun InsightsScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 8.dp, bottom = 72.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 1. TODAY'S HERO METRIC CARD
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, NothingBorder, RoundedCornerShape(16.dp)),
-                    colors = CardDefaults.cardColors(containerColor = NothingCard),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
+                GlassSurface(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Text(
                             text = "TODAY'S CASH COLLECTED",
@@ -104,9 +95,7 @@ fun InsightsScreen(
                             letterSpacing = 1.sp,
                             color = NothingGray
                         )
-
                         Spacer(modifier = Modifier.height(4.dp))
-
                         Text(
                             text = Paise(insights.todayTotalPaise).toFormattedRupees(),
                             fontFamily = FontFamily.Monospace,
@@ -114,58 +103,21 @@ fun InsightsScreen(
                             fontSize = 32.sp,
                             color = NothingWhite
                         )
-
                         Spacer(modifier = Modifier.height(14.dp))
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column {
-                                Text(
-                                    text = "COMMISSION",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    color = NothingGray
-                                )
-                                Text(
-                                    text = Paise(insights.todayCommissionPaise).toFormattedRupees(),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = NothingGreen
-                                )
-                            }
-
-                            Column {
-                                Text(
-                                    text = "TRANSACTIONS",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    color = NothingGray
-                                )
-                                Text(
-                                    text = "${insights.todayCount} txns",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = NothingWhite
-                                )
-                            }
+                            Metric("COMMISSION", Paise(insights.todayCommissionPaise).toFormattedRupees(), NothingGreen)
+                            Metric("TXNS", "${insights.todayCount}", NothingWhite)
+                            Metric("7D TOTAL", Paise(insights.weeklyTotalPaise).toFormattedRupees(), NothingWhite)
                         }
                     }
                 }
             }
 
-            // 2. 7-DAY VOLUME TREND BARS
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, NothingBorder, RoundedCornerShape(16.dp)),
-                    colors = CardDefaults.cardColors(containerColor = NothingCard),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
+                GlassSurface(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -173,7 +125,7 @@ fun InsightsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "7-DAY VOLUME TREND",
+                                text = "LAST 7 DAYS",
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp,
@@ -181,22 +133,59 @@ fun InsightsScreen(
                                 color = NothingGray
                             )
                             Text(
-                                text = "7D: ${Paise(insights.weeklyTotalPaise).toFormattedRupees()}",
+                                text = Paise(insights.weeklyTotalPaise).toFormattedRupees(),
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp,
                                 color = NothingWhite
                             )
                         }
-
                         Spacer(modifier = Modifier.height(16.dp))
-
                         VolumeBarChart(buckets = insights.last7DaysTrend)
                     }
                 }
             }
 
-            // 3. TOP CUSTOMERS LEADERBOARD
+            item {
+                GlassSurface(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text(
+                            text = "LAST 30 DAYS",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            letterSpacing = 1.sp,
+                            color = NothingGray
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Metric("COLLECTED", Paise(insights.monthlyTotalPaise).toFormattedRupees(), NothingWhite)
+                            Metric("COMMISSION", Paise(insights.monthlyCommissionPaise).toFormattedRupees(), NothingGreen)
+                            Metric("AVG / DAY", Paise(insights.monthAvgPerDayPaise).toFormattedRupees(), NothingWhite)
+                        }
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = "MONTHLY BREAKDOWN",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    letterSpacing = 1.sp,
+                    color = NothingGray,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            items(insights.last6MonthsTrend) { bucket ->
+                MonthlyRow(bucket)
+            }
+
             item {
                 Text(
                     text = "TOP COUNTERPARTIES",
@@ -205,7 +194,7 @@ fun InsightsScreen(
                     fontSize = 12.sp,
                     letterSpacing = 1.sp,
                     color = NothingGray,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
 
@@ -220,17 +209,9 @@ fun InsightsScreen(
                 }
             } else {
                 items(insights.topCustomers) { customer ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, NothingBorder, RoundedCornerShape(12.dp)),
-                        colors = CardDefaults.cardColors(containerColor = NothingCardRaised),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
+                    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -248,7 +229,6 @@ fun InsightsScreen(
                                     color = NothingGray
                                 )
                             }
-
                             Text(
                                 text = Paise(customer.totalAmountPaise).toFormattedRupees(),
                                 fontFamily = FontFamily.Monospace,
@@ -259,6 +239,45 @@ fun InsightsScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Metric(label: String, value: String, valueColor: Color) {
+    Column {
+        Text(label, fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = NothingGray)
+        Text(value, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = valueColor)
+    }
+}
+
+@Composable
+private fun MonthlyRow(bucket: MonthlyBucket) {
+    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(bucket.monthLabel, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = NothingWhite)
+                Text("${bucket.count} txns", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingGray)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = Paise(bucket.totalPaise).toFormattedRupees(),
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = NothingWhite
+                )
+                Text(
+                    text = "Comm ${Paise(bucket.commissionPaise).toFormattedRupees()}",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = NothingGreen
+                )
             }
         }
     }
@@ -294,11 +313,9 @@ private fun VolumeBarChart(buckets: List<DailyTrendBucket>) {
                         .fillMaxWidth(0.55f)
                         .fillMaxHeight(fraction)
                         .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                        .background(if (isToday) NothingRed else if (bucket.totalPaise > 0) Color.White else NothingCardRaised)
+                        .background(if (isToday) NothingRed else if (bucket.totalPaise > 0) Color.White else NothingCard)
                 )
-
                 Spacer(modifier = Modifier.height(6.dp))
-
                 Text(
                     text = bucket.dayLabel.take(3),
                     fontFamily = FontFamily.Monospace,

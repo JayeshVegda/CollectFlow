@@ -19,9 +19,6 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
     }
 
     signingConfigs {
@@ -107,12 +104,6 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     compileOnly("com.google.errorprone:error_prone_annotations:2.20.0")
     compileOnly("com.google.code.findbugs:jsr305:3.0.2")
-
-    // TDLib native prebuilt binary (arm64-v8a, 16 KB page aligned ELF) plus the official TDLib
-    // Java bindings (org.drinkless.tdlib). The app talks to TDLib through its own small coroutine
-    // wrapper (service/telegram/TdLibClient.kt), so that database parameters, native logging and
-    // the initialization order are fully under this app's control.
-    implementation(files("libs/core-release.aar"))
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

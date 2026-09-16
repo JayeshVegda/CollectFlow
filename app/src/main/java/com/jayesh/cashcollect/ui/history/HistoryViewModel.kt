@@ -19,6 +19,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+enum class SortOption(val label: String) {
+    NEWEST("Newest first"),
+    OLDEST("Oldest first"),
+    HIGHEST_AMOUNT("Highest amount")
+}
+
 class HistoryViewModel(
     private val collectionRepo: CollectionRepository,
     private val csvExporter: CsvExporter
@@ -30,22 +36,39 @@ class HistoryViewModel(
     private val _selectedStatus = MutableStateFlow<CollectionStatus?>(null)
     val selectedStatus: StateFlow<CollectionStatus?> = _selectedStatus.asStateFlow()
 
+    private val _sortOption = MutableStateFlow(SortOption.NEWEST)
+    val sortOption: StateFlow<SortOption> = _sortOption.asStateFlow()
+
     val historyList: StateFlow<List<CollectionItem>> = collectionRepo.getAllHistory()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val filteredItems: StateFlow<List<CollectionItem>> = combine(
         historyList,
         _searchQuery,
-        _selectedStatus
-    ) { items, query, status ->
-        items.filter { item ->
+        _selectedStatus,
+        _sortOption
+    ) { items, query, status, sort ->
+        val filtered = items.filter { item ->
             val matchesQuery = query.isBlank() ||
                     item.customerDisplayName.contains(query, ignoreCase = true) ||
                     (item.note != null && item.note.contains(query, ignoreCase = true))
             val matchesStatus = status == null || item.status == status
             matchesQuery && matchesStatus
         }
+        when (sort) {
+            SortOption.NEWEST -> filtered.sortedByDescending { it.createdAt }
+            SortOption.OLDEST -> filtered.sortedBy { it.createdAt }
+            SortOption.HIGHEST_AMOUNT -> filtered.sortedByDescending { it.amountPaise }
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun toggleSort() {
+        _sortOption.value = when (_sortOption.value) {
+            SortOption.NEWEST -> SortOption.OLDEST
+            SortOption.OLDEST -> SortOption.HIGHEST_AMOUNT
+            SortOption.HIGHEST_AMOUNT -> SortOption.NEWEST
+        }
+    }
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query

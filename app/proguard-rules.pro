@@ -31,13 +31,3 @@
 # Keep WorkManager
 -keep class androidx.work.** { *; }
 -keep class com.jayesh.cashcollect.service.reminder.** { *; }
-
-# Keep TDLib JNI bindings and generated models
--keep class org.drinkless.tdlib.** { *; }
--keepclassmembers class org.drinkless.tdlib.** { *; }
--dontwarn org.drinkless.tdlib.**
--keep class io.github.tdlibandroid.ktx.** { *; }
-
-# Keep ZXing QR Code
--keep class com.google.zxing.** { *; }
--dontwarn com.google.zxing.**

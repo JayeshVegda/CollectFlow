@@ -30,7 +30,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,8 +63,6 @@ import com.jayesh.cashcollect.ui.theme.CashCollectTheme
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
 import com.jayesh.cashcollect.ui.theme.NothingMuted
-import androidx.compose.material.icons.filled.Dashboard
-import com.jayesh.cashcollect.ui.dashboard.DashboardScreen
 import com.jayesh.cashcollect.ui.theme.NothingWhite
 import com.jayesh.cashcollect.widget.CashCollectWidgetProvider
 import kotlinx.coroutines.Job
@@ -75,7 +72,6 @@ import kotlinx.coroutines.launch
 sealed class Screen {
     object Collections : Screen()
     object Insights : Screen()
-    object Dashboard : Screen()
     object History : Screen()
     object Settings : Screen()
     object AddCollection : Screen()
@@ -84,7 +80,6 @@ sealed class Screen {
 
 class MainActivity : ComponentActivity() {
 
-    /** Emits each new intent so the Compose tree can react (widget quick-capture, notification tap). */
     private val deepLinkFlow = MutableStateFlow<Intent?>(null)
 
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -93,7 +88,7 @@ class MainActivity : ComponentActivity() {
         if (!granted) {
             Toast.makeText(
                 this,
-                "Notifications are disabled — receipt reminders and Telegram failure alerts will not appear.",
+                "Notifications are disabled — receipt reminders will not appear.",
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -105,7 +100,6 @@ class MainActivity : ComponentActivity() {
         deepLinkFlow.value = intent
     }
 
-    /** Android 13+ requires an explicit runtime grant before any notification can be shown. */
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         val granted = ContextCompat.checkSelfPermission(
@@ -128,18 +122,13 @@ class MainActivity : ComponentActivity() {
         val openQuickCaptureDirectly = intent.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false)
 
         setContent {
-            CompositionLocalProvider(
-                androidx.lifecycle.compose.LocalLifecycleOwner provides this,
-                androidx.compose.ui.platform.LocalLifecycleOwner provides this
-            ) {
-                CashCollectTheme {
+            CashCollectTheme {
                 val collectViewModel: CollectViewModel = viewModel(
                     factory = CollectViewModel.Factory(
                         collectionRepo = app.collectionRepository,
                         customerRepo = app.customerRepository,
                         settingsRepo = app.settingsRepository,
-                        notificationManager = app.notificationManager,
-                        telegramManager = app.telegramManager
+                        notificationManager = app.notificationManager
                     )
                 )
 
@@ -152,8 +141,7 @@ class MainActivity : ComponentActivity() {
 
                 val settingsViewModel: SettingsViewModel = viewModel(
                     factory = SettingsViewModel.Factory(
-                        settingsRepo = app.settingsRepository,
-                        telegramManager = app.telegramManager
+                        settingsRepo = app.settingsRepository
                     )
                 )
 
@@ -172,7 +160,6 @@ class MainActivity : ComponentActivity() {
                         "detail" -> Screen.Detail(detailId)
                         "add" -> Screen.AddCollection
                         "insights" -> Screen.Insights
-                        "dashboard" -> Screen.Dashboard
                         "history" -> Screen.History
                         "settings" -> Screen.Settings
                         else -> Screen.Collections
@@ -186,7 +173,6 @@ class MainActivity : ComponentActivity() {
                         }
                         is Screen.AddCollection -> "add"
                         is Screen.Insights -> "insights"
-                        is Screen.Dashboard -> "dashboard"
                         is Screen.History -> "history"
                         is Screen.Settings -> "settings"
                         is Screen.Collections -> "collections"
@@ -197,8 +183,6 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(openQuickCaptureDirectly)
                 }
 
-                // Widget/notification taps arriving while the app is already alive
-                // (singleTask launch mode) are delivered through onNewIntent.
                 val deepLinkIntent by deepLinkFlow.collectAsStateWithLifecycle()
                 LaunchedEffect(deepLinkIntent) {
                     val i = deepLinkIntent ?: return@LaunchedEffect
@@ -214,7 +198,6 @@ class MainActivity : ComponentActivity() {
                     deepLinkFlow.value = null
                 }
 
-
                 BackHandler(enabled = currentScreen !is Screen.Collections) {
                     goTo(Screen.Collections)
                 }
@@ -225,13 +208,10 @@ class MainActivity : ComponentActivity() {
                 val customerSearchResults = remember { MutableStateFlow<List<Customer>>(emptyList()) }
                 val searchResultsState by customerSearchResults.collectAsStateWithLifecycle()
                 val scope = rememberCoroutineScope()
-                // One cancellable collector for customer search: a new query cancels the previous
-                // Room Flow instead of leaking a collector per keystroke.
                 var searchJob by remember { mutableStateOf<Job?>(null) }
 
                 val isRootTab = currentScreen is Screen.Collections ||
                         currentScreen is Screen.Insights ||
-                        currentScreen is Screen.Dashboard ||
                         currentScreen is Screen.History ||
                         currentScreen is Screen.Settings
 
@@ -249,110 +229,29 @@ class MainActivity : ComponentActivity() {
                                     containerColor = NothingBlack,
                                     windowInsets = NavigationBarDefaults.windowInsets
                                 ) {
-                                    NavigationBarItem(
+                                    NavItem(
                                         selected = currentScreen is Screen.Collections,
-                                        onClick = { goTo(Screen.Collections) },
+                                        label = "COLLECT",
                                         icon = { Icon(Icons.Default.List, contentDescription = "Collections") },
-                                        label = {
-                                            Text(
-                                                text = if (currentScreen is Screen.Collections) "[ COLLECT ]" else "COLLECT",
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = if (currentScreen is Screen.Collections) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 10.sp,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = NothingWhite,
-                                            selectedTextColor = NothingWhite,
-                                            indicatorColor = Color.Transparent,
-                                            unselectedIconColor = NothingMuted,
-                                            unselectedTextColor = NothingMuted
-                                        )
+                                        onClick = { goTo(Screen.Collections) }
                                     )
-                                    NavigationBarItem(
+                                    NavItem(
                                         selected = currentScreen is Screen.Insights,
-                                        onClick = { goTo(Screen.Insights) },
+                                        label = "INSIGHTS",
                                         icon = { Icon(Icons.Default.Analytics, contentDescription = "Insights") },
-                                        label = {
-                                            Text(
-                                                text = if (currentScreen is Screen.Insights) "[ INSIGHTS ]" else "INSIGHTS",
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = if (currentScreen is Screen.Insights) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 10.sp,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = NothingWhite,
-                                            selectedTextColor = NothingWhite,
-                                            indicatorColor = Color.Transparent,
-                                            unselectedIconColor = NothingMuted,
-                                            unselectedTextColor = NothingMuted
-                                        )
+                                        onClick = { goTo(Screen.Insights) }
                                     )
-                                    NavigationBarItem(
-                                        selected = currentScreen is Screen.Dashboard,
-                                        onClick = { goTo(Screen.Dashboard) },
-                                        icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
-                                        label = {
-                                            Text(
-                                                text = if (currentScreen is Screen.Dashboard) "[ DASHBOARD ]" else "DASHBOARD",
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = if (currentScreen is Screen.Dashboard) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 10.sp,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = NothingWhite,
-                                            selectedTextColor = NothingWhite,
-                                            indicatorColor = Color.Transparent,
-                                            unselectedIconColor = NothingMuted,
-                                            unselectedTextColor = NothingMuted
-                                        )
-                                    )
-                                    NavigationBarItem(
+                                    NavItem(
                                         selected = currentScreen is Screen.History,
-                                        onClick = { goTo(Screen.History) },
+                                        label = "HISTORY",
                                         icon = { Icon(Icons.Default.History, contentDescription = "History") },
-                                        label = {
-                                            Text(
-                                                text = if (currentScreen is Screen.History) "[ HISTORY ]" else "HISTORY",
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = if (currentScreen is Screen.History) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 10.sp,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = NothingWhite,
-                                            selectedTextColor = NothingWhite,
-                                            indicatorColor = Color.Transparent,
-                                            unselectedIconColor = NothingMuted,
-                                            unselectedTextColor = NothingMuted
-                                        )
+                                        onClick = { goTo(Screen.History) }
                                     )
-                                    NavigationBarItem(
+                                    NavItem(
                                         selected = currentScreen is Screen.Settings,
-                                        onClick = { goTo(Screen.Settings) },
+                                        label = "SETTINGS",
                                         icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                                        label = {
-                                            Text(
-                                                text = if (currentScreen is Screen.Settings) "[ SETTINGS ]" else "SETTINGS",
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = if (currentScreen is Screen.Settings) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 10.sp,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = NothingWhite,
-                                            selectedTextColor = NothingWhite,
-                                            indicatorColor = Color.Transparent,
-                                            unselectedIconColor = NothingMuted,
-                                            unselectedTextColor = NothingMuted
-                                        )
+                                        onClick = { goTo(Screen.Settings) }
                                     )
                                 }
                             }
@@ -382,24 +281,6 @@ class MainActivity : ComponentActivity() {
 
                             is Screen.Insights -> {
                                 InsightsScreen(collections = historyList)
-                            }
-
-                            is Screen.Dashboard -> {
-                                val currentSettings by settingsViewModel.settings.collectAsStateWithLifecycle()
-                                val authState by settingsViewModel.telegramAuthState.collectAsStateWithLifecycle()
-                                DashboardScreen(
-                                    collections = historyList,
-                                    appSettings = currentSettings,
-                                    telegramAuthState = authState,
-                                    onQuickCaptureClick = {
-                                        goTo(Screen.Collections)
-                                        shouldOpenQuickCapture = true
-                                    },
-                                    onCollectionClick = { id -> goTo(Screen.Detail(id)) },
-                                    onGoToHistory = { goTo(Screen.History) },
-                                    onGoToSettings = { goTo(Screen.Settings) },
-                                    onExportCsv = { historyViewModel.exportCsv(this@MainActivity) }
-                                )
                             }
 
                             is Screen.AddCollection -> {
@@ -461,9 +342,7 @@ class MainActivity : ComponentActivity() {
                                             reason = reason,
                                             newAmountPaise = newAmountPaise,
                                             note = note,
-                                            onSuccess = {
-                                                goTo(Screen.Collections)
-                                            }
+                                            onSuccess = { goTo(Screen.Collections) }
                                         )
                                     },
                                     onBackClick = { goTo(Screen.Collections) }
@@ -503,7 +382,7 @@ class MainActivity : ComponentActivity() {
                                     onRestoreBackupClick = {
                                         Toast.makeText(
                                             this@MainActivity,
-                                            "To restore, copy backup file to backups folder or import via file manager.",
+                                            "To restore, copy the backup file to the backups folder or import via file manager.",
                                             Toast.LENGTH_LONG
                                         ).show()
                                     },
@@ -517,4 +396,33 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.NavItem(
+    selected: Boolean,
+    label: String,
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit
+) {
+    NavigationBarItem(
+        selected = selected,
+        onClick = onClick,
+        icon = icon,
+        label = {
+            Text(
+                text = if (selected) "[ $label ]" else label,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 10.sp,
+                letterSpacing = 0.5.sp
+            )
+        },
+        colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = NothingWhite,
+            selectedTextColor = NothingWhite,
+            indicatorColor = Color.Transparent,
+            unselectedIconColor = NothingMuted,
+            unselectedTextColor = NothingMuted
+        )
+    )
 }

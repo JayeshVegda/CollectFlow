@@ -32,19 +32,6 @@ interface SettingsDao {
     @Query("UPDATE settings SET message_template = :template WHERE id = 1")
     suspend fun updateMessageTemplate(template: String)
 
-    @Query(
-        "UPDATE settings SET telegram_enabled = :enabled, telegram_api_id = :apiId, " +
-            "telegram_api_hash = :apiHash, telegram_recipient = :recipient, " +
-            "telegram_fallback_whatsapp = :fallbackWhatsApp WHERE id = 1"
-    )
-    suspend fun updateTelegramSettings(
-        enabled: Boolean,
-        apiId: String,
-        apiHash: String,
-        recipient: String,
-        fallbackWhatsApp: Boolean
-    )
-
     @Query("UPDATE settings SET last_backup_at = :timestamp WHERE id = 1")
     suspend fun updateLastBackupTimestamp(timestamp: Long)
 }

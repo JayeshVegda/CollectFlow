@@ -28,9 +28,7 @@ data class CollectionWithCustomer(
             voidReason = collection.voidReason,
             replacedById = collection.replacedById,
             replacesId = collection.replacesId,
-            note = collection.note,
-            lastDispatchError = collection.lastDispatchError,
-            lastDispatchAttemptAt = collection.lastDispatchAttemptAt
+            note = collection.note
         )
     }
 }

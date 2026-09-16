@@ -38,33 +38,11 @@ class SettingsRepository(private val settingsDao: SettingsDao) {
         settingsDao.updateMessageTemplate(template.trim())
     }
 
-    suspend fun updateTelegramSettings(
-        enabled: Boolean,
-        apiId: String,
-        apiHash: String,
-        recipient: String,
-        fallbackWhatsApp: Boolean
-    ) {
-        settingsDao.ensureRow(SettingsEntity())
-        settingsDao.updateTelegramSettings(
-            enabled = enabled,
-            apiId = apiId.trim(),
-            apiHash = apiHash.trim(),
-            recipient = recipient.trim(),
-            fallbackWhatsApp = fallbackWhatsApp
-        )
-    }
-
     private fun SettingsEntity.toDomain() = AppSettings(
         id = id,
         brotherWhatsAppNumber = brotherWhatsAppNumber,
         commissionRatePerThousand = commissionRatePerThousand,
         lastBackupAt = lastBackupAt,
-        messageTemplate = messageTemplate,
-        telegramEnabled = telegramEnabled,
-        telegramApiId = telegramApiId,
-        telegramApiHash = telegramApiHash,
-        telegramRecipient = telegramRecipient,
-        telegramFallbackWhatsApp = telegramFallbackWhatsApp
+        messageTemplate = messageTemplate
     )
 }

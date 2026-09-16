@@ -28,3 +28,12 @@ val NothingAmberBorder = Color(0x4DD4A843)
 val NothingGreen = Color(0xFF4A9E5C)          // Confirmed success
 val NothingGreenBg = Color(0x1A4A9E5C)
 val NothingGreenBorder = Color(0x4D4A9E5C)
+
+// Liquid Glass layer — translucent fills blended over the OLED black canvas.
+// Kept at low alpha so the monochrome Nothing hierarchy still reads clearly.
+val NothingGlass = Color(0x12FFFFFF)          // Base frosted fill (~7%)
+val NothingGlassRaised = Color(0x1CFFFFFF)    // Raised frosted fill (~11%)
+val NothingGlassBorder = Color(0x2EFFFFFF)    // 1px glass edge (~18%)
+val NothingGlassHighlight = Color(0x24FFFFFF) // Top-left sheen (~14%)
+val NothingGlassTint = Color(0x08FFFFFF)      // Ultra-subtle wash (~3%)
+val NothingScrim = Color(0x99000000)          // Sheet backdrop dim

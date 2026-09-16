@@ -21,6 +21,13 @@ data class DailyTrendBucket(
     val count: Int
 )
 
+data class MonthlyBucket(
+    val monthLabel: String,
+    val totalPaise: Long,
+    val commissionPaise: Long,
+    val count: Int
+)
+
 data class InsightsSummary(
     val todayTotalPaise: Long,
     val todayCommissionPaise: Long,
@@ -29,32 +36,31 @@ data class InsightsSummary(
     val weeklyCommissionPaise: Long,
     val weeklyCount: Int,
     val monthlyTotalPaise: Long,
+    val monthlyCommissionPaise: Long,
     val monthlyCount: Int,
+    val monthAvgPerDayPaise: Long,
+    val monthBestDayPaise: Long,
     val topCustomers: List<CustomerVolume>,
-    val last7DaysTrend: List<DailyTrendBucket>
+    val last7DaysTrend: List<DailyTrendBucket>,
+    val last6MonthsTrend: List<MonthlyBucket>
 )
 
 object AnalyticsEngine {
 
     fun computeInsights(collections: List<CollectionItem>): InsightsSummary {
-        // Exclude VOIDED items from revenue totals
         val validItems = collections.filter { it.status != CollectionStatus.VOIDED }
 
         val cal = Calendar.getInstance()
-        val now = cal.timeInMillis
 
-        // Start of today (00:00:00)
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
         cal.set(Calendar.SECOND, 0)
         cal.set(Calendar.MILLISECOND, 0)
         val startOfToday = cal.timeInMillis
 
-        // Start of 7 days ago
         cal.add(Calendar.DAY_OF_YEAR, -6)
         val startOf7Days = cal.timeInMillis
 
-        // Start of 30 days ago
         cal.timeInMillis = startOfToday
         cal.add(Calendar.DAY_OF_YEAR, -29)
         val startOf30Days = cal.timeInMillis
@@ -68,9 +74,10 @@ object AnalyticsEngine {
         var weeklyCount = 0
 
         var monthlyTotal = 0L
+        var monthlyCommission = 0L
         var monthlyCount = 0
 
-        val customerMap = mutableMapOf<String, Pair<CustomerVolume, Long>>()
+        val customerMap = mutableMapOf<String, CustomerVolume>()
 
         for (item in validItems) {
             val itemTime = item.receivedAt ?: item.createdAt
@@ -89,45 +96,34 @@ object AnalyticsEngine {
 
             if (itemTime >= startOf30Days) {
                 monthlyTotal += item.amountPaise
+                monthlyCommission += item.commissionPaise
                 monthlyCount++
             }
 
-            // Customer aggregation
             val key = item.customerDisplayName
             val current = customerMap[key]
-            if (current == null) {
-                customerMap[key] = Pair(
-                    CustomerVolume(
-                        customerName = item.customerName,
-                        customerAlias = item.customerAlias,
-                        totalAmountPaise = item.amountPaise,
-                        transactionCount = 1
-                    ),
-                    item.amountPaise
+            customerMap[key] = if (current == null) {
+                CustomerVolume(
+                    customerName = item.customerName,
+                    customerAlias = item.customerAlias,
+                    totalAmountPaise = item.amountPaise,
+                    transactionCount = 1
                 )
             } else {
-                customerMap[key] = Pair(
-                    current.first.copy(
-                        totalAmountPaise = current.first.totalAmountPaise + item.amountPaise,
-                        transactionCount = current.first.transactionCount + 1
-                    ),
-                    current.first.totalAmountPaise + item.amountPaise
+                current.copy(
+                    totalAmountPaise = current.totalAmountPaise + item.amountPaise,
+                    transactionCount = current.transactionCount + 1
                 )
             }
         }
 
         val topCustomers = customerMap.values
-            .map { it.first }
             .sortedByDescending { it.totalAmountPaise }
             .take(5)
 
-        // Generate Last 7 Days daily buckets
         val trendBuckets = mutableListOf<DailyTrendBucket>()
         val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
         val dateFormat = SimpleDateFormat("dd/MM", Locale.getDefault())
-
-        val tempCal = Calendar.getInstance()
-        tempCal.timeInMillis = startOfToday
 
         for (i in 6 downTo 0) {
             val loopCal = Calendar.getInstance()
@@ -141,16 +137,57 @@ object AnalyticsEngine {
                 t in dayStart..dayEnd
             }
 
-            val dayTotal = dayItems.sumOf { it.amountPaise }
             trendBuckets.add(
                 DailyTrendBucket(
                     dayLabel = if (i == 0) "Today" else dayFormat.format(Date(dayStart)),
                     dateLabel = dateFormat.format(Date(dayStart)),
-                    totalPaise = dayTotal,
+                    totalPaise = dayItems.sumOf { it.amountPaise },
                     count = dayItems.size
                 )
             )
         }
+
+        val monthBuckets = mutableListOf<MonthlyBucket>()
+        val monthLabelFormat = SimpleDateFormat("MMM", Locale.getDefault())
+
+        for (i in 5 downTo 0) {
+            val loopCal = Calendar.getInstance()
+            loopCal.timeInMillis = startOfToday
+            loopCal.add(Calendar.MONTH, -i)
+
+            val monthStartCal = loopCal.clone() as Calendar
+            monthStartCal.set(Calendar.DAY_OF_MONTH, 1)
+            monthStartCal.set(Calendar.HOUR_OF_DAY, 0)
+            monthStartCal.set(Calendar.MINUTE, 0)
+            monthStartCal.set(Calendar.SECOND, 0)
+            monthStartCal.set(Calendar.MILLISECOND, 0)
+            val monthStart = monthStartCal.timeInMillis
+
+            val monthEndCal = loopCal.clone() as Calendar
+            monthEndCal.set(Calendar.DAY_OF_MONTH, loopCal.getActualMaximum(Calendar.DAY_OF_MONTH))
+            monthEndCal.set(Calendar.HOUR_OF_DAY, 23)
+            monthEndCal.set(Calendar.MINUTE, 59)
+            monthEndCal.set(Calendar.SECOND, 59)
+            monthEndCal.set(Calendar.MILLISECOND, 999)
+            val monthEnd = monthEndCal.timeInMillis
+
+            val monthItems = validItems.filter {
+                val t = it.receivedAt ?: it.createdAt
+                t in monthStart..monthEnd
+            }
+
+            monthBuckets.add(
+                MonthlyBucket(
+                    monthLabel = monthLabelFormat.format(Date(monthStart)),
+                    totalPaise = monthItems.sumOf { it.amountPaise },
+                    commissionPaise = monthItems.sumOf { it.commissionPaise },
+                    count = monthItems.size
+                )
+            )
+        }
+
+        val monthBestDay = trendBuckets.maxOfOrNull { it.totalPaise } ?: 0L
+        val monthAvgPerDay = if (monthlyCount > 0) monthlyTotal / 30 else 0L
 
         return InsightsSummary(
             todayTotalPaise = todayTotal,
@@ -160,9 +197,13 @@ object AnalyticsEngine {
             weeklyCommissionPaise = weeklyCommission,
             weeklyCount = weeklyCount,
             monthlyTotalPaise = monthlyTotal,
+            monthlyCommissionPaise = monthlyCommission,
             monthlyCount = monthlyCount,
+            monthAvgPerDayPaise = monthAvgPerDay,
+            monthBestDayPaise = monthBestDay,
             topCustomers = topCustomers,
-            last7DaysTrend = trendBuckets
+            last7DaysTrend = trendBuckets,
+            last6MonthsTrend = monthBuckets
         )
     }
 }

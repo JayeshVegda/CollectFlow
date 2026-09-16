@@ -52,18 +52,12 @@ class CollectionRepository(
         return collectionDao.getWithCustomerById(id)?.toDomain()
     }
 
-    /**
-     * Checks if a duplicate entry exists within [withinMinutes].
-     */
     suspend fun checkRecentDuplicate(customerId: Long, amountPaise: Long, withinMinutes: Int = 30): Boolean {
         val since = System.currentTimeMillis() - (withinMinutes * 60 * 1000L)
         val count = collectionDao.countRecentDuplicates(customerId, amountPaise, since)
         return count > 0
     }
 
-    /**
-     * Creates and stores a new PENDING collection with snapshotted commission rate and commission value.
-     */
     suspend fun createPendingCollection(
         customerId: Long,
         amountPaise: Long,
@@ -95,9 +89,7 @@ class CollectionRepository(
     }
 
     /**
-     * Non-negotiable: Persists receipt state to Room BEFORE WhatsApp intent fires.
-     * Transitions status from PENDING -> RECEIPT_CONFIRMED.
-     * If already RECEIPT_CONFIRMED, leaves status intact and only returns item.
+     * Non-negotiable: persists receipt state to Room BEFORE any WhatsApp intent fires.
      */
     suspend fun markReceivedAndCommit(id: Long): CollectionItem {
         return database.withTransaction {
@@ -118,17 +110,10 @@ class CollectionRepository(
         }
     }
 
-    /**
-     * Reopening WhatsApp for an already-received item records the reopen timestamp
-     * without changing status or duplicating any receipts.
-     */
     suspend fun logWhatsAppOpened(id: Long) {
         collectionDao.updateWhatsAppOpenedAt(id, System.currentTimeMillis())
     }
 
-    /**
-     * Explicit "Yes, sent" user confirmation moves status to CONFIRMED.
-     */
     suspend fun confirmSent(id: Long) {
         database.withTransaction {
             val entity = collectionDao.getById(id)
@@ -139,16 +124,14 @@ class CollectionRepository(
 
             val updated = entity.copy(
                 status = CollectionStatus.CONFIRMED.name,
-                confirmedSentAt = System.currentTimeMillis(),
-                lastDispatchError = null
+                confirmedSentAt = System.currentTimeMillis()
             )
             collectionDao.update(updated)
         }
     }
 
     /**
-     * Idempotent confirm used by the Telegram delivery-ACK callback. Never throws when the entry
-     * was already confirmed, voided or deleted — the ACK can arrive after the operator acted.
+     * Idempotent confirm: never throws when the entry was already confirmed or voided.
      */
     suspend fun confirmSentSafely(id: Long) {
         database.withTransaction {
@@ -161,33 +144,12 @@ class CollectionRepository(
             collectionDao.update(
                 entity.copy(
                     status = CollectionStatus.CONFIRMED.name,
-                    confirmedSentAt = System.currentTimeMillis(),
-                    lastDispatchError = null,
-                    lastDispatchAttemptAt = System.currentTimeMillis()
+                    confirmedSentAt = System.currentTimeMillis()
                 )
             )
         }
     }
 
-    /**
-     * Records a failed Telegram dispatch WITHOUT changing the cash state. The operator can then
-     * fall back to WhatsApp and mark the entry sent manually.
-     */
-    suspend fun markDispatchFailed(id: Long, error: String) {
-        database.withTransaction {
-            val entity = collectionDao.getById(id) ?: return@withTransaction
-            collectionDao.update(
-                entity.copy(
-                    lastDispatchError = error.take(500),
-                    lastDispatchAttemptAt = System.currentTimeMillis()
-                )
-            )
-        }
-    }
-
-    /**
-     * Corrections: Voids the original record with a mandatory reason, and creates a linked replacement.
-     */
     suspend fun voidAndReplace(
         originalId: Long,
         voidReason: String,
@@ -207,7 +169,6 @@ class CollectionRepository(
             val now = System.currentTimeMillis()
             val newCommissionPaise = CommissionCalculator.calculate(newAmountPaise, commissionRateSnapshot)
 
-            // 1. Create replacement row pointing back to original
             val replacementEntity = CollectionEntity(
                 customerId = original.customerId,
                 amountPaise = newAmountPaise,
@@ -220,7 +181,6 @@ class CollectionRepository(
             )
             val newId = collectionDao.insert(replacementEntity)
 
-            // 2. Void original row pointing forward to replacement
             val voidedOriginal = original.copy(
                 status = CollectionStatus.VOIDED.name,
                 voidedAt = now,
@@ -233,9 +193,6 @@ class CollectionRepository(
         }
     }
 
-    /**
-     * Direct voiding without immediate replacement.
-     */
     suspend fun voidCollection(id: Long, voidReason: String) {
         val validatedReason = CollectionStateMachine.validateVoidReason(voidReason)
 
@@ -272,8 +229,7 @@ class CollectionRepository(
     }
 
     /**
-     * Edits an entry in place. Only a PENDING entry may be edited: once cash is in hand the
-     * amount is a committed financial fact and may only be corrected via [voidAndReplace].
+     * Edits an entry in place. Only a PENDING entry may be edited.
      */
     suspend fun updateCollection(id: Long, amountPaise: Long, note: String?) {
         require(amountPaise > 0L) { "Amount in paise must be positive: $amountPaise" }

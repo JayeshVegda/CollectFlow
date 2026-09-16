@@ -16,15 +16,5 @@ data class SettingsEntity(
     @ColumnInfo(name = "last_backup_at")
     val lastBackupAt: Long? = null,
     @ColumnInfo(name = "message_template")
-    val messageTemplate: String = MessageTemplateEngine.DEFAULT_TEMPLATE,
-    @ColumnInfo(name = "telegram_enabled")
-    val telegramEnabled: Boolean = false,
-    @ColumnInfo(name = "telegram_api_id")
-    val telegramApiId: String = "",
-    @ColumnInfo(name = "telegram_api_hash")
-    val telegramApiHash: String = "",
-    @ColumnInfo(name = "telegram_recipient")
-    val telegramRecipient: String = "",
-    @ColumnInfo(name = "telegram_fallback_whatsapp")
-    val telegramFallbackWhatsApp: Boolean = true
+    val messageTemplate: String = MessageTemplateEngine.DEFAULT_TEMPLATE
 )
