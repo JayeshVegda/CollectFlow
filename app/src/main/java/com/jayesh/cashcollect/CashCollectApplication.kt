@@ -24,6 +24,7 @@ class CashCollectApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        com.jayesh.cashcollect.crash.CrashHandler.install(this)
 
         database = AppDatabase.getInstance(this)
         customerRepository = CustomerRepository(database.customerDao())

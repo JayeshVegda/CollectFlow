@@ -19,7 +19,7 @@ data class CollectionWithCustomer(
             amountPaise = collection.amountPaise,
             commissionRateSnapshot = collection.commissionRateSnapshot,
             commissionPaise = collection.commissionPaise,
-            status = CollectionStatus.valueOf(collection.status),
+            status = runCatching { CollectionStatus.valueOf(collection.status) }.getOrDefault(CollectionStatus.PENDING),
             createdAt = collection.createdAt,
             receivedAt = collection.receivedAt,
             whatsappOpenedAt = collection.whatsappOpenedAt,

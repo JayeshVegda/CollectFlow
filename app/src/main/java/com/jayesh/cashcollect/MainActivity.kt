@@ -112,9 +112,11 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        )
         super.onCreate(savedInstanceState)
-        requestNotificationPermissionIfNeeded()
 
         val app = application as CashCollectApplication
         val initialCollectionId = intent.getLongExtra("EXTRA_COLLECTION_ID", -1L)
@@ -122,6 +124,9 @@ class MainActivity : ComponentActivity() {
         val openQuickCaptureDirectly = intent.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false)
 
         setContent {
+            LaunchedEffect(Unit) {
+                requestNotificationPermissionIfNeeded()
+            }
             CashCollectTheme {
                 val collectViewModel: CollectViewModel = viewModel(
                     factory = CollectViewModel.Factory(

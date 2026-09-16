@@ -31,7 +31,7 @@ import com.jayesh.cashcollect.ui.theme.NothingGray
 @Composable
 fun GlassSurface(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape = RoundedCornerShape(16.dp),
     borderWidth: Dp = 1.dp,
     sheen: Boolean = true,
     content: @Composable BoxScope.() -> Unit
@@ -58,7 +58,7 @@ fun GlassSurface(
 fun GlassMetricRow(
     modifier: Modifier = Modifier,
     metrics: List<Triple<String, String, Color>>,
-    shape: Shape = RoundedCornerShape(18.dp)
+    shape: Shape = RoundedCornerShape(16.dp)
 ) {
     GlassSurface(modifier = modifier.fillMaxWidth(), shape = shape) {
         Row(

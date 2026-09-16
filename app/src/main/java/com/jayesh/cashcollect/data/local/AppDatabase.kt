@@ -156,8 +156,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        private fun buildDatabase(context: Context): AppDatabase {
-            runCatching { backupBeforeMigrationIfNeeded(context) }
+        fun resetDatabase(context: Context) {
+            synchronized(this) {
+                try {
+                    INSTANCE?.close()
+                } catch (e: Exception) {
+                    // Ignore close exception
+                }
+                INSTANCE = null
+                val appContext = context.applicationContext
+                appContext.deleteDatabase(DATABASE_NAME)
+                val dbFile = appContext.getDatabasePath(DATABASE_NAME)
+                runCatching { File(dbFile.path + "-wal").delete() }
+                runCatching { File(dbFile.path + "-shm").delete() }
+                runCatching { File(dbFile.path + "-journal").delete() }
+            }
+        }
+
+        private fun createRoomBuilder(context: Context): RoomDatabase.Builder<AppDatabase> {
             return Room.databaseBuilder(
                 context,
                 AppDatabase::class.java,
@@ -165,6 +181,7 @@ abstract class AppDatabase : RoomDatabase() {
             )
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigrationOnDowngrade()
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
@@ -183,7 +200,22 @@ abstract class AppDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .build()
+        }
+
+        private fun buildDatabase(context: Context): AppDatabase {
+            runCatching { backupBeforeMigrationIfNeeded(context) }
+            val db = createRoomBuilder(context).build()
+            return try {
+                // Proactively verify the database and schema can open; if migration fails, auto-reset fresh!
+                db.openHelper.writableDatabase
+                db
+            } catch (e: Throwable) {
+                android.util.Log.e("AppDatabase", "Database migration or open failed, resetting database to ensure crash-free startup", e)
+                resetDatabase(context)
+                val freshDb = createRoomBuilder(context).build()
+                freshDb.openHelper.writableDatabase
+                freshDb
+            }
         }
 
         private fun backupBeforeMigrationIfNeeded(context: Context) {
