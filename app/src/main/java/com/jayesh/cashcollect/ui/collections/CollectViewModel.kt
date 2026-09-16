@@ -74,6 +74,28 @@ class CollectViewModel(
     val pendingList: StateFlow<List<CollectionItem>> = collectionRepo.getPendingCollections()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /**
+     * Entries that are collected AND already reported today — the DONE bucket on the Today
+     * screen. Without this the operator had no way to see what they had finished today,
+     * only an aggregate count.
+     */
+    val doneTodayList: StateFlow<List<CollectionItem>> = collectionRepo.getAllHistory()
+        .map { list ->
+            val todayStart = startOfToday()
+            list.filter {
+                it.status == CollectionStatus.CONFIRMED &&
+                    (it.receivedAt ?: it.createdAt) >= todayStart
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private fun startOfToday(): Long = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
     val commissionRate: StateFlow<Int> = settingsRepo.getSettings()
         .map { it.commissionRatePerThousand }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 3)

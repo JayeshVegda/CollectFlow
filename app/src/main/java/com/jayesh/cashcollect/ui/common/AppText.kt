@@ -67,14 +67,15 @@ fun AmountText(
     modifier: Modifier = Modifier,
     style: TextStyle = AppType.amount,
     color: Color = TextDisplay,
-    strikethrough: Boolean = false
+    strikethrough: Boolean = false,
+    align: TextAlign = TextAlign.End
 ) {
     Text(
         text = Paise(amountPaise).toFormattedRupees(),
         modifier = modifier,
         style = style,
         color = color,
-        textAlign = TextAlign.End,
+        textAlign = align,
         textDecoration = if (strikethrough) TextDecoration.LineThrough else null,
         maxLines = 1
     )

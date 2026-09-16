@@ -53,13 +53,36 @@ private const val TABULAR_FIGURES = "tnum"
  */
 object AppType {
 
-    /** The one hero number per screen. Doto dot-matrix, 48sp. Restricted to 36sp+. */
+    /**
+     * Doto dot-matrix numerals, 48sp. Restricted to 36sp+ and to WHOLE NUMBERS ONLY.
+     *
+     * Verified glyph coverage: Doto's cmap has digits, comma and dot, but it does NOT
+     * contain the rupee sign (U+20B9) — Space Grotesk and Space Mono both do. So putting a
+     * money string in Doto makes Android silently font-fall-back for the ₹ alone, rendering
+     * the number in two typefaces. Use this for counts ("12 PARTIES", a day number) and
+     * never for currency — use [displayMoney] for money.
+     */
     val displayHero = TextStyle(
         fontFamily = Doto,
         fontWeight = FontWeight.Bold,
         fontSize = 48.sp,
         lineHeight = 50.sp,
         letterSpacing = (-0.02).em
+    )
+
+    /**
+     * The money hero — the one "absurdly large" primary number on a screen.
+     *
+     * Space Grotesk Medium at 40sp with tabular figures: legible at a glance, has the ₹
+     * glyph, and aligns in columns. This is the Apple-style "one primary" slot.
+     */
+    val displayMoney = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 40.sp,
+        lineHeight = 44.sp,
+        letterSpacing = (-0.02).em,
+        fontFeatureSettings = TABULAR_FIGURES
     )
 
     /** Section hero: the big number on a card that is not THE hero. */
