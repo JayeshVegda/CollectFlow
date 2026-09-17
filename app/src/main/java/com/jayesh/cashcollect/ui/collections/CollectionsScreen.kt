@@ -443,7 +443,14 @@ fun CollectionsScreen(
  * The header is the only place a state name appears, which is what lets the row itself stay
  * down to three facts. Groups are ordered by what needs doing next, so "what is next" is
  * answered by scroll position instead of by scanning a badge on every card.
+ *
+ * `@OptIn` is required here, not just on `CollectionRow`: `Modifier.animateItemPlacement` is a
+ * `LazyItemScope` extension marked `@ExperimentalFoundationApi`, so every function whose body
+ * *calls* it needs its own opt-in, even though the modifier itself is constructed inside the
+ * `item {}` / `items {}` lambdas. Opt-in is lexically scoped, so one annotation on this function
+ * covers both call sites below.
  */
+@OptIn(ExperimentalFoundationApi::class)
 private fun LazyListScope.entryGroup(
     key: String,
     title: String,
