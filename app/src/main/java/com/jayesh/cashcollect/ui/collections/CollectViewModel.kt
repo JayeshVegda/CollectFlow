@@ -10,6 +10,7 @@ import com.jayesh.cashcollect.data.repository.CustomerRepository
 import com.jayesh.cashcollect.data.repository.SettingsRepository
 import com.jayesh.cashcollect.domain.model.AppSettings
 import com.jayesh.cashcollect.domain.model.CollectionItem
+import com.jayesh.cashcollect.domain.model.Customer
 import com.jayesh.cashcollect.service.notification.AppNotificationManager
 import com.jayesh.cashcollect.service.whatsapp.WhatsAppLauncher
 import com.jayesh.cashcollect.widget.CashCollectWidgetProvider
@@ -41,6 +42,9 @@ class CollectViewModel(
 
     companion object {
         private const val VOID_REASON_QUICK = "Quick swipe void (no reason given)"
+
+        /** How many recent parties Quick Capture offers as name pills. */
+        private const val RECENT_CUSTOMER_LIMIT = 20
     }
 
     val todayStats: StateFlow<TodayStats> = collectionRepo.getAllHistory()
@@ -99,6 +103,18 @@ class CollectViewModel(
     val commissionRate: StateFlow<Int> = settingsRepo.getSettings()
         .map { it.commissionRatePerThousand }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 3)
+
+    /**
+     * Most recently used parties, for the Quick Capture name pills.
+     *
+     * `getRecentCustomers` is backed by `ORDER BY last_used_at DESC`, so this is "the parties I
+     * actually deal with, newest first" — for a repeat customer the first pill is usually the
+     * correct tap, which is the whole point of the pills. Twenty is far more than one
+     * horizontal scroll shows and costs nothing to hold.
+     */
+    val recentCustomers: StateFlow<List<Customer>> =
+        customerRepo.getRecentCustomers(RECENT_CUSTOMER_LIMIT)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isQuickCaptureOpen = MutableStateFlow(false)
     val isQuickCaptureOpen: StateFlow<Boolean> = _isQuickCaptureOpen.asStateFlow()
