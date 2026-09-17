@@ -35,6 +35,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,7 +43,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.jayesh.cashcollect.domain.model.Customer
@@ -90,6 +95,13 @@ fun QuickCaptureBottomSheet(
     var rawInput by remember { mutableStateOf("") }
     var noteInput by remember { mutableStateOf("") }
     val parsed = remember(rawInput) { SmartInputParser.parse(rawInput) }
+
+    // The field takes focus the moment the sheet opens, so the keyboard is already up. The sheet
+    // is opened in order to type; making the operator tap the field first buys nothing.
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        runCatching { focusRequester.requestFocus() }
+    }
 
     // A parse counts only once it has both halves. The sheet previews and saves this one value
     // rather than re-parsing at each call site, so the preview can never disagree with what
@@ -162,7 +174,9 @@ fun QuickCaptureBottomSheet(
             OutlinedTextField(
                 value = rawInput,
                 onValueChange = { rawInput = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
                 placeholder = {
                     Text(
                         text = "party + amount",
@@ -322,6 +336,8 @@ private fun PillRow(
     values: List<String>,
     onPick: (String) -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -341,7 +357,10 @@ private fun PillRow(
                     modifier = Modifier
                         .height(36.dp)
                         .clip(RoundedCornerShape(Radius.pill))
-                        .clickable { onPick(value) }
+                        .clickable {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onPick(value)
+                        }
                         .border(1.dp, NothingBorderVisible, RoundedCornerShape(Radius.pill))
                         .padding(horizontal = Space.md),
                     contentAlignment = Alignment.Center

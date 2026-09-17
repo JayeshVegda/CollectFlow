@@ -51,7 +51,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -66,6 +68,7 @@ import com.jayesh.cashcollect.ui.common.AppSectionLabel
 import com.jayesh.cashcollect.ui.common.AppSurface
 import com.jayesh.cashcollect.ui.common.EditCollectionBottomSheet
 import com.jayesh.cashcollect.ui.theme.AppType
+import com.jayesh.cashcollect.ui.theme.Motion
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingGreen
@@ -138,7 +141,9 @@ fun CollectRoute(
         onOpenWhatsAppAgain = { item -> viewModel.openWhatsAppAgain(context, item) },
         onConfirmReported = { id -> viewModel.confirmSent(context, id) },
         onDeleteCollection = { id -> viewModel.deleteCollection(context, id) },
-        onUpdateCollection = { id, amt, note -> viewModel.updateCollection(context, id, amt, note) },
+        onUpdateCollection = { id, name, amt, date, note ->
+            viewModel.updateCollection(context, id, name, amt, date, note)
+        },
         onVoidInstantly = { item -> viewModel.voidInstantly(context, item) },
         onBulkReceiveAndSend = { items -> viewModel.receiveAndSendAll(context, items) },
         onBulkMarkSent = { items -> viewModel.markAllSent(context, items) }
@@ -162,7 +167,7 @@ fun CollectionsScreen(
     onOpenWhatsAppAgain: (CollectionItem) -> Unit,
     onConfirmReported: (Long) -> Unit,
     onDeleteCollection: (Long) -> Unit,
-    onUpdateCollection: (Long, Long, String?) -> Unit,
+    onUpdateCollection: (Long, String, Long, Long, String?) -> Unit,
     onVoidInstantly: (CollectionItem) -> Unit = {},
     onBulkReceiveAndSend: (List<CollectionItem>) -> Unit = {},
     onBulkMarkSent: (List<CollectionItem>) -> Unit = {}
@@ -193,8 +198,11 @@ fun CollectionsScreen(
         if (selectedIds.isEmpty()) selectionMode = false
     }
 
+    val haptics = LocalHapticFeedback.current
+
     // Shared row callbacks, so each group stays a short invocation.
     val handleLongClick: (CollectionItem) -> Unit = { item ->
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         selectionMode = true
         if (item.id !in selectedIds) selectedIds.add(item.id)
     }
@@ -280,6 +288,7 @@ fun CollectionsScreen(
                 SummaryStrip(
                     toCollectPaise = pendingList.sumOf { it.amountPaise },
                     toCollectCount = pendingList.size,
+                    toCollectCommissionPaise = pendingList.sumOf { it.commissionPaise },
                     collectedPaise = todayStats.totalPaise,
                     commissionPaise = todayStats.commissionPaise
                 )
@@ -293,11 +302,13 @@ fun CollectionsScreen(
                         pendingCount = pendingList.count { it.id in selectedIds },
                         reportCount = outstandingList.count { it.id in selectedIds },
                         onReceive = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             onBulkReceiveAndSend(pendingList.filter { it.id in selectedIds })
                             selectedIds.clear()
                             selectionMode = false
                         },
                         onMarkReported = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             onBulkMarkSent(outstandingList.filter { it.id in selectedIds })
                             selectedIds.clear()
                             selectionMode = false
@@ -399,11 +410,11 @@ fun CollectionsScreen(
             onDismiss = {
                 scope.launch { editSheetState.hide() }.invokeOnCompletion { itemToEdit = null }
             },
-            onSave = { amountPaise, note ->
+            onSave = { name, amountPaise, dateMillis, note ->
                 scope.launch { editSheetState.hide() }.invokeOnCompletion {
                     val id = item.id
                     itemToEdit = null
-                    onUpdateCollection(id, amountPaise, note)
+                    onUpdateCollection(id, name, amountPaise, dateMillis, note)
                 }
             },
             onDelete = {
@@ -442,6 +453,7 @@ private fun LazyListScope.entryGroup(
 
     item(key = "header_" + key) {
         GroupHeader(
+            modifier = Modifier.animateItemPlacement(Motion.standard()),
             title = title,
             count = rows.size,
             totalPaise = rows.sumOf { it.amountPaise },
@@ -451,9 +463,13 @@ private fun LazyListScope.entryGroup(
         )
     }
 
-    items(rows, key = { row -> key + "_" + row.id }) { row ->
+    // Keyed by the entry id alone rather than by group, so an entry that changes state keeps its
+    // identity: LazyColumn animates it to its new group instead of cutting it out and pasting it
+    // back in. That movement is the feedback — the row visibly goes where the work went.
+    items(rows, key = { row -> row.id }) { row ->
         CollectionRow(
             item = row,
+            modifier = Modifier.animateItemPlacement(Motion.standard()),
             isSelected = row.id in selectedIds,
             onLongClick = { onLongClick(row) },
             onTap = { onTap(row) },
@@ -472,6 +488,7 @@ private fun LazyListScope.entryGroup(
  */
 @Composable
 private fun GroupHeader(
+    modifier: Modifier = Modifier,
     title: String,
     count: Int,
     totalPaise: Long,
@@ -480,7 +497,7 @@ private fun GroupHeader(
     topPadding: Dp
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(top = topPadding, bottom = Space.sm),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -493,10 +510,12 @@ private fun GroupHeader(
 /**
  * The summary: two numbers, one line each, no card.
  *
- * TO COLLECT leads because it is the question the app gets opened to answer; today's collected
- * total sits beside it so the day's progress needs no second glance. Party count and commission
- * sit under each number as a small caption — context, not decisions — and they are stacked
- * rather than inline so a large amount can never squeeze its own caption off the row. The
+ * TO COLLECT leads because it is the question the app gets opened to answer — the money still
+ * out, how many parties it is spread across, and the commission riding on it, so the operator
+ * knows what the outstanding work is worth before touching anything. COLLECTED TODAY sits beside
+ * it with today's commission, so the day's progress needs no second glance. Both captions are
+ * stacked under their number rather than inline so a large amount can never squeeze its own
+ * caption off the row. The
  * previous board also carried an entry count, an inner divider and a "waiting to be reported"
  * line, all of which are either re-stated by the labelled, counted groups below or were never
  * acted on; it cost roughly 200dp above the first row of the queue.
@@ -505,6 +524,7 @@ private fun GroupHeader(
 private fun SummaryStrip(
     toCollectPaise: Long,
     toCollectCount: Int,
+    toCollectCommissionPaise: Long,
     collectedPaise: Long,
     commissionPaise: Long
 ) {
@@ -525,7 +545,7 @@ private fun SummaryStrip(
                     align = TextAlign.Start
                 )
                 Text(
-                    text = partyCountLabel(toCollectCount),
+                    text = toCollectCaption(toCollectCount, toCollectCommissionPaise),
                     style = AppType.caption,
                     color = TextTertiary,
                     maxLines = 1
@@ -581,6 +601,7 @@ private fun SummaryStrip(
 private fun CollectionRow(
     item: CollectionItem,
     isSelected: Boolean,
+    modifier: Modifier = Modifier,
     onLongClick: () -> Unit,
     onTap: () -> Unit,
     onReceive: () -> Unit,
@@ -592,6 +613,7 @@ private fun CollectionRow(
     val isPending = item.status == CollectionStatus.PENDING
     val isReported = item.status == CollectionStatus.CONFIRMED
     val awaitingReport = !isPending && !isReported
+    val haptics = LocalHapticFeedback.current
 
     val dismissState = rememberSwipeToDismissBoxState()
 
@@ -601,10 +623,13 @@ private fun CollectionRow(
     LaunchedEffect(dismissState.currentValue) {
         when (dismissState.currentValue) {
             SwipeToDismissBoxValue.StartToEnd -> {
+                // The buzz is the acknowledgement: the gesture fired.
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 advance()
                 dismissState.reset()
             }
             SwipeToDismissBoxValue.EndToStart -> {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onVoid()
                 dismissState.reset()
             }
@@ -622,7 +647,7 @@ private fun CollectionRow(
                 endLabel = "CANCEL"
             )
         },
-        modifier = Modifier.padding(bottom = Space.listAdjacent)
+        modifier = modifier.padding(bottom = Space.listAdjacent)
     ) {
         AppSurface(
             modifier = Modifier
@@ -639,7 +664,7 @@ private fun CollectionRow(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Space.md, vertical = Space.sm),
+                    .padding(horizontal = Space.md, vertical = Space.md),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Space.sm)
             ) {
@@ -666,11 +691,14 @@ private fun CollectionRow(
 
                 if (awaitingReport) {
                     OutlinedButton(
-                        onClick = onMarkReported,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onMarkReported()
+                        },
                         shape = RoundedCornerShape(Radius.pill),
                         border = BorderStroke(1.dp, NothingAmber),
-                        contentPadding = PaddingValues(horizontal = Space.sm, vertical = 0.dp),
-                        modifier = Modifier.height(30.dp)
+                        contentPadding = PaddingValues(horizontal = Space.md, vertical = 0.dp),
+                        modifier = Modifier.height(34.dp)
                     ) {
                         Text(text = "SENT", style = AppType.labelMono, color = NothingAmber)
                     }
@@ -690,7 +718,7 @@ private fun CollectionRow(
 private fun metaLine(item: CollectionItem): String {
     val commission = "comm " + Paise(item.commissionPaise).toFormattedRupees()
     val day = staleDayLabel(item.receivedAt ?: item.createdAt)
-    return if (day == null) commission else commission + "   ·   " + day
+    return if (day == null) commission else commission + " · " + day
 }
 
 /**
@@ -722,6 +750,16 @@ private fun partyCountLabel(count: Int): String = when {
     count <= 0 -> "all clear"
     count == 1 -> "1 party"
     else -> count.toString() + " parties"
+}
+
+/**
+ * The TO COLLECT caption: how many parties the outstanding money is spread across, and the
+ * commission riding on it. When there is nothing left to collect it says so and stops — a zero
+ * count with a zero commission is not worth spelling out.
+ */
+private fun toCollectCaption(partyCount: Int, commissionPaise: Long): String {
+    if (partyCount <= 0) return "all clear"
+    return partyCountLabel(partyCount) + " · comm " + Paise(commissionPaise).toFormattedRupees()
 }
 
 /** Revealed behind a row while it is being swiped. Colour is on the label only. */

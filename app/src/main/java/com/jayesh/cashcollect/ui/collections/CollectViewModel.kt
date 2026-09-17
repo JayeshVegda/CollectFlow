@@ -230,6 +230,7 @@ class CollectViewModel(
                     Toast.makeText(context, "Could not void: ${it.message}", Toast.LENGTH_LONG).show()
                 }
                 .onSuccess {
+                    notificationManager.cancelReceiptNotification(item.id)
                     CashCollectWidgetProvider.notifyDataChanged(context)
                     Toast.makeText(context, "Voided ${item.customerDisplayName}", Toast.LENGTH_SHORT).show()
                 }
@@ -275,6 +276,8 @@ class CollectViewModel(
                 .onFailure {
                     Toast.makeText(context, "Could not confirm: ${it.message}", Toast.LENGTH_LONG).show()
                 }
+            // The entry is reported now, so its "Reported?" prompt has no job left.
+            notificationManager.cancelReceiptNotification(id)
             CashCollectWidgetProvider.notifyDataChanged(context)
             Toast.makeText(context, "Confirmed sent", Toast.LENGTH_SHORT).show()
         }
@@ -287,15 +290,25 @@ class CollectViewModel(
                     Toast.makeText(context, it.message ?: "Could not delete", Toast.LENGTH_LONG).show()
                 }
                 .onSuccess {
+                    notificationManager.cancelReceiptNotification(id)
                     CashCollectWidgetProvider.notifyDataChanged(context)
                     Toast.makeText(context, "Entry deleted", Toast.LENGTH_SHORT).show()
                 }
         }
     }
 
-    fun updateCollection(context: Context, id: Long, amountPaise: Long, note: String?) {
+    fun updateCollection(
+        context: Context,
+        id: Long,
+        customerName: String,
+        amountPaise: Long,
+        dateMillis: Long,
+        note: String?
+    ) {
         viewModelScope.launch {
-            runCatching { collectionRepo.updateCollection(id, amountPaise, note) }
+            runCatching {
+                collectionRepo.updateCollection(id, customerName, amountPaise, dateMillis, note)
+            }
                 .onFailure {
                     Toast.makeText(context, it.message ?: "Could not update", Toast.LENGTH_LONG).show()
                 }

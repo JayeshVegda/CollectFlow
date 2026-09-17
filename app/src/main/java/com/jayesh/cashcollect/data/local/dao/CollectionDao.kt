@@ -100,6 +100,13 @@ interface CollectionDao {
     @Query("SELECT * FROM collections")
     suspend fun getAllSync(): List<CollectionEntity>
 
+    /**
+     * Cheap emptiness probe. Used as the guard before pre-filling the sample history, so the
+     * seeder costs one indexed count instead of loading every row on every launch.
+     */
+    @Query("SELECT COUNT(*) FROM collections")
+    suspend fun countAll(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(collections: List<CollectionEntity>)
 

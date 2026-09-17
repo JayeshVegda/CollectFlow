@@ -5,11 +5,15 @@ import android.util.Log
 import com.jayesh.cashcollect.data.backup.CsvExporter
 import com.jayesh.cashcollect.data.backup.EncryptedBackupManager
 import com.jayesh.cashcollect.data.local.AppDatabase
+import com.jayesh.cashcollect.data.local.SampleHistory
 import com.jayesh.cashcollect.data.repository.CollectionRepository
 import com.jayesh.cashcollect.data.repository.CustomerRepository
 import com.jayesh.cashcollect.data.repository.SettingsRepository
 import com.jayesh.cashcollect.service.notification.AppNotificationManager
 import com.jayesh.cashcollect.service.reminder.UnconfirmedReminderWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class CashCollectApplication : Application() {
 
@@ -38,6 +42,18 @@ class CashCollectApplication : Application() {
         notificationManager = AppNotificationManager(this)
         backupManager = EncryptedBackupManager(this, database)
         csvExporter = CsvExporter(this)
+
+        // Pre-filled operating history (see SampleHistory). Fire-and-forget and failure-tolerant:
+        // seeding must never delay or crash startup, and it no-ops once the operator has data.
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                SampleHistory.seedIfEmpty(
+                    database = database,
+                    commissionRatePerThousand = settingsRepository.getSettingsSync()
+                        .commissionRatePerThousand
+                )
+            }.onFailure { Log.e(TAG, "Failed to seed sample history", it) }
+        }
 
         runCatching { UnconfirmedReminderWorker.schedule(this) }
             .onFailure { Log.e(TAG, "Failed to schedule periodic reminder worker", it) }

@@ -229,22 +229,64 @@ class CollectionRepository(
     }
 
     /**
-     * Edits an entry in place. Only a PENDING entry may be edited.
+     * Edits an entry in place: party, amount, date and note.
+     *
+     * The operator is the only source of truth for their own ledger, so any entry that is still
+     * part of the account — PENDING, RECEIPT_CONFIRMED or CONFIRMED — can be corrected here
+     * instead of being voided and re-entered. VOIDED entries stay immutable: they are the audit
+     * trail of a correction that already happened.
+     *
+     * Three details that matter:
+     *  - Commission is recomputed from the entry's OWN rate snapshot, so changing the rate in
+     *    Settings never retroactively rewrites an old entry.
+     *  - A rename renames the party (a name fix is a fix for every entry of that party). If the
+     *    typed name already belongs to another party, the entry is re-pointed at that party
+     *    rather than creating a duplicate customer row.
+     *  - The date moves with the entry. For a receipt that already happened, `received_at` moves
+     *    too, because that is the timestamp the "collected today" figure counts.
      */
-    suspend fun updateCollection(id: Long, amountPaise: Long, note: String?) {
+    suspend fun updateCollection(
+        id: Long,
+        customerName: String,
+        amountPaise: Long,
+        dateMillis: Long,
+        note: String?
+    ) {
+        val name = customerName.trim()
+        require(name.isNotBlank()) { "Party name cannot be empty" }
         require(amountPaise > 0L) { "Amount in paise must be positive: $amountPaise" }
+
         database.withTransaction {
             val existing = collectionDao.getById(id)
                 ?: throw IllegalArgumentException("Collection #$id not found")
             val status = CollectionStatus.valueOf(existing.status)
-            check(status == CollectionStatus.PENDING) {
-                "Only a PENDING entry can be edited. #$id is ${status.name} — use void & replace."
+            check(status != CollectionStatus.VOIDED) {
+                "A VOIDED entry cannot be edited. #$id is the audit trail of a correction."
             }
-            val commPaise = CommissionCalculator.calculate(amountPaise, existing.commissionRateSnapshot)
+
+            val currentCustomer = customerDao.getById(existing.customerId)
+            val nameMatch = customerDao.findByName(name)
+
+            val targetCustomerId = if (nameMatch != null && nameMatch.id != existing.customerId) {
+                // The typed name is an existing party: merge onto it, never duplicate it.
+                nameMatch.id
+            } else {
+                if (currentCustomer != null && currentCustomer.name != name) {
+                    customerDao.update(currentCustomer.copy(name = name))
+                }
+                existing.customerId
+            }
+
             collectionDao.update(
                 existing.copy(
+                    customerId = targetCustomerId,
                     amountPaise = amountPaise,
-                    commissionPaise = commPaise,
+                    commissionPaise = CommissionCalculator.calculate(
+                        amountPaise,
+                        existing.commissionRateSnapshot
+                    ),
+                    createdAt = dateMillis,
+                    receivedAt = existing.receivedAt?.let { dateMillis },
                     note = note?.trim()?.takeIf { it.isNotEmpty() }
                 )
             )

@@ -51,6 +51,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jayesh.cashcollect.domain.model.Customer
+import com.jayesh.cashcollect.service.notification.AppNotificationManager
 import com.jayesh.cashcollect.ui.add.AddCollectionScreen
 import com.jayesh.cashcollect.ui.collections.CollectRoute
 import com.jayesh.cashcollect.ui.collections.CollectViewModel
@@ -123,6 +124,10 @@ class MainActivity : ComponentActivity() {
         val initialCollectionId = intent.getLongExtra("EXTRA_COLLECTION_ID", -1L)
         val openAddDirectly = intent.getBooleanExtra("EXTRA_OPEN_ADD", false)
         val openQuickCaptureDirectly = intent.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false)
+
+        // The launch intent goes through the same flow as a warm one, so a notification action
+        // behaves identically whether the app was already open or is starting cold.
+        deepLinkFlow.value = intent
 
         setContent {
             CompositionLocalProvider(
@@ -197,7 +202,17 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(deepLinkIntent) {
                     val i = deepLinkIntent ?: return@LaunchedEffect
                     val collectionId = i.getLongExtra("EXTRA_COLLECTION_ID", -1L)
+                    val markReportedId = i.getLongExtra(
+                        AppNotificationManager.EXTRA_MARK_REPORTED_ID,
+                        -1L
+                    )
                     when {
+                        // One tap on the notification's "YES, REPORTED" action closes the loop:
+                        // the entry moves to REPORTED and the queue is re-shown.
+                        markReportedId > 0L -> {
+                            collectViewModel.confirmSent(this@MainActivity, markReportedId)
+                            goTo(Screen.Collections)
+                        }
                         collectionId > 0 -> goTo(Screen.Detail(collectionId))
                         i.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false) -> {
                             goTo(Screen.Collections)
