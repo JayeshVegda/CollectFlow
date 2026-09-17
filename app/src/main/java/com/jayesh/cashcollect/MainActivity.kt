@@ -59,6 +59,8 @@ import com.jayesh.cashcollect.ui.detail.CollectionDetailScreen
 import com.jayesh.cashcollect.ui.history.HistoryRoute
 import com.jayesh.cashcollect.ui.history.HistoryViewModel
 import com.jayesh.cashcollect.ui.insights.InsightsScreen
+import com.jayesh.cashcollect.ui.party.PartyLedgerRoute
+import com.jayesh.cashcollect.ui.party.PartyLedgerViewModel
 import com.jayesh.cashcollect.ui.settings.SettingsRoute
 import com.jayesh.cashcollect.ui.settings.SettingsViewModel
 import com.jayesh.cashcollect.ui.theme.CashCollectTheme
@@ -78,6 +80,12 @@ sealed class Screen {
     object Settings : Screen()
     object AddCollection : Screen()
     data class Detail(val collectionId: Long) : Screen()
+
+    /**
+     * One party's ledger. Navigation carries the party id, so the page can be opened from any
+     * screen that shows a party name.
+     */
+    data class PartyLedger(val customerId: Long) : Screen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -170,9 +178,11 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 var detailId by rememberSaveable { mutableStateOf(initialCollectionId) }
-                val currentScreen: Screen = remember(screenToken, detailId) {
+                var partyCustomerId by rememberSaveable { mutableStateOf(-1L) }
+                val currentScreen: Screen = remember(screenToken, detailId, partyCustomerId) {
                     when (screenToken) {
                         "detail" -> Screen.Detail(detailId)
+                        "party" -> Screen.PartyLedger(partyCustomerId)
                         "add" -> Screen.AddCollection
                         "insights" -> Screen.Insights
                         "history" -> Screen.History
@@ -186,6 +196,10 @@ class MainActivity : ComponentActivity() {
                             detailId = target.collectionId
                             "detail"
                         }
+                        is Screen.PartyLedger -> {
+                            partyCustomerId = target.customerId
+                            "party"
+                        }
                         is Screen.AddCollection -> "add"
                         is Screen.Insights -> "insights"
                         is Screen.History -> "history"
@@ -197,6 +211,9 @@ class MainActivity : ComponentActivity() {
                 var shouldOpenQuickCapture by rememberSaveable {
                     mutableStateOf(openQuickCaptureDirectly)
                 }
+                // A party page hands the capture sheet the party's name, so a repeat party is one
+                // tap on the ledger and then straight to the amount.
+                var quickCapturePrefill by rememberSaveable { mutableStateOf("") }
 
                 val deepLinkIntent by deepLinkFlow.collectAsStateWithLifecycle()
                 LaunchedEffect(deepLinkIntent) {
@@ -236,10 +253,13 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 var searchJob by remember { mutableStateOf<Job?>(null) }
 
+                // A party page is a browsing surface rather than a drill-in, so the tab bar stays
+                // available and there is always a one-tap way back to the queue.
                 val isRootTab = currentScreen is Screen.Collections ||
                         currentScreen is Screen.Insights ||
                         currentScreen is Screen.History ||
-                        currentScreen is Screen.Settings
+                        currentScreen is Screen.Settings ||
+                        currentScreen is Screen.PartyLedger
 
                 Scaffold(
                     containerColor = NothingBlack,
@@ -296,12 +316,15 @@ class MainActivity : ComponentActivity() {
                                 CollectRoute(
                                     viewModel = collectViewModel,
                                     initialOpenQuickCapture = shouldOpenQuickCapture,
+                                    quickCapturePrefill = quickCapturePrefill,
                                     onQuickCaptureDismissed = {
                                         shouldOpenQuickCapture = false
+                                        quickCapturePrefill = ""
                                         intent.removeExtra("EXTRA_OPEN_QUICK_CAPTURE")
                                     },
                                     onAddCollectionClick = { goTo(Screen.AddCollection) },
                                     onCollectionClick = { id -> goTo(Screen.Detail(id)) },
+                                    onPartyClick = { customerId -> goTo(Screen.PartyLedger(customerId)) },
                                     onSettingsClick = { goTo(Screen.Settings) }
                                 )
                             }
@@ -372,14 +395,39 @@ class MainActivity : ComponentActivity() {
                                             onSuccess = { goTo(Screen.Collections) }
                                         )
                                     },
+                                    onPartyClick = { customerId ->
+                                        goTo(Screen.PartyLedger(customerId))
+                                    },
                                     onBackClick = { goTo(Screen.Collections) }
+                                )
+                            }
+
+                            is Screen.PartyLedger -> {
+                                val partyViewModel: PartyLedgerViewModel = viewModel(
+                                    key = "party_" + screen.customerId,
+                                    factory = PartyLedgerViewModel.Factory(
+                                        customerId = screen.customerId,
+                                        collectionRepo = app.collectionRepository,
+                                        customerRepo = app.customerRepository
+                                    )
+                                )
+                                PartyLedgerRoute(
+                                    viewModel = partyViewModel,
+                                    onBackClick = { goTo(Screen.Collections) },
+                                    onEntryClick = { id -> goTo(Screen.Detail(id)) },
+                                    onNewEntryClick = { name ->
+                                        quickCapturePrefill = name
+                                        goTo(Screen.Collections)
+                                        shouldOpenQuickCapture = true
+                                    }
                                 )
                             }
 
                             is Screen.History -> {
                                 HistoryRoute(
                                     viewModel = historyViewModel,
-                                    onItemClick = { id -> goTo(Screen.Detail(id)) }
+                                    onItemClick = { id -> goTo(Screen.Detail(id)) },
+                                    onPartyClick = { customerId -> goTo(Screen.PartyLedger(customerId)) }
                                 )
                             }
 

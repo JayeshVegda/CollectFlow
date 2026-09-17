@@ -34,6 +34,13 @@ class CollectionRepository(
         }
     }
 
+    /** Every entry for one party, newest first — the party ledger's list. */
+    fun getCollectionsForCustomer(customerId: Long): Flow<List<CollectionItem>> {
+        return collectionDao.getByCustomer(customerId).map { list ->
+            list.map { it.toDomain() }
+        }
+    }
+
     fun filterHistory(
         status: CollectionStatus?,
         fromTimestamp: Long?,

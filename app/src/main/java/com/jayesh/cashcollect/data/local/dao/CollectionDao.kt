@@ -34,6 +34,15 @@ interface CollectionDao {
         SELECT c.*, cust.name AS customer_name, cust.alias AS customer_alias
         FROM collections c
         INNER JOIN customers cust ON c.customer_id = cust.id
+        WHERE c.customer_id = :customerId
+        ORDER BY c.created_at DESC
+    """)
+    fun getByCustomer(customerId: Long): Flow<List<CollectionWithCustomer>>
+
+    @Query("""
+        SELECT c.*, cust.name AS customer_name, cust.alias AS customer_alias
+        FROM collections c
+        INNER JOIN customers cust ON c.customer_id = cust.id
         ORDER BY c.created_at DESC
     """)
     fun getAllHistory(): Flow<List<CollectionWithCustomer>>

@@ -112,9 +112,11 @@ import java.util.Locale
 fun CollectRoute(
     viewModel: CollectViewModel,
     initialOpenQuickCapture: Boolean,
+    quickCapturePrefill: String,
     onQuickCaptureDismissed: () -> Unit,
     onAddCollectionClick: () -> Unit,
     onCollectionClick: (Long) -> Unit,
+    onPartyClick: (Long) -> Unit,
     onSettingsClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -133,10 +135,12 @@ fun CollectRoute(
         commissionRatePerThousand = commissionRate,
         recentCustomers = recentCustomers,
         initialOpenQuickCapture = initialOpenQuickCapture,
+        quickCapturePrefill = quickCapturePrefill,
         onQuickCaptureDismissed = onQuickCaptureDismissed,
         onAddCollectionClick = onAddCollectionClick,
         onQuickCaptureSave = { name, amt, note -> viewModel.saveQuickCapture(context, name, amt, note) },
         onCollectionClick = onCollectionClick,
+        onPartyClick = onPartyClick,
         onReceiveAndWhatsApp = { item -> viewModel.confirmReceive(context, item) },
         onOpenWhatsAppAgain = { item -> viewModel.openWhatsAppAgain(context, item) },
         onConfirmReported = { id -> viewModel.confirmSent(context, id) },
@@ -158,11 +162,13 @@ fun CollectionsScreen(
     doneTodayList: List<CollectionItem>,
     commissionRatePerThousand: Int,
     recentCustomers: List<Customer> = emptyList(),
+    quickCapturePrefill: String = "",
     initialOpenQuickCapture: Boolean = false,
     onQuickCaptureDismissed: () -> Unit = {},
     onAddCollectionClick: () -> Unit,
     onQuickCaptureSave: (customerName: String, amountPaise: Long, note: String?) -> Unit,
     onCollectionClick: (Long) -> Unit,
+    onPartyClick: (Long) -> Unit = {},
     onReceiveAndWhatsApp: (CollectionItem) -> Unit,
     onOpenWhatsAppAgain: (CollectionItem) -> Unit,
     onConfirmReported: (Long) -> Unit,
@@ -343,6 +349,7 @@ fun CollectionsScreen(
                 onReceive = handleReceive,
                 onOpenWhatsApp = handleOpenWhatsApp,
                 onMarkReported = handleMarkReported,
+                onPartyClick = onPartyClick,
                 onVoid = handleVoid
             )
 
@@ -360,6 +367,7 @@ fun CollectionsScreen(
                 onReceive = handleReceive,
                 onOpenWhatsApp = handleOpenWhatsApp,
                 onMarkReported = handleMarkReported,
+                onPartyClick = onPartyClick,
                 onVoid = handleVoid
             )
 
@@ -376,6 +384,7 @@ fun CollectionsScreen(
                 onReceive = handleReceive,
                 onOpenWhatsApp = handleOpenWhatsApp,
                 onMarkReported = handleMarkReported,
+                onPartyClick = onPartyClick,
                 onVoid = handleVoid
             )
         }
@@ -386,6 +395,7 @@ fun CollectionsScreen(
             sheetState = quickCaptureSheetState,
             commissionRatePerThousand = commissionRatePerThousand,
             recentCustomers = recentCustomers,
+            initialInput = quickCapturePrefill,
             onDismiss = {
                 isQuickCaptureOpen = false
                 onQuickCaptureDismissed()
@@ -447,6 +457,7 @@ private fun LazyListScope.entryGroup(
     onReceive: (CollectionItem) -> Unit,
     onOpenWhatsApp: (CollectionItem) -> Unit,
     onMarkReported: (CollectionItem) -> Unit,
+    onPartyClick: (Long) -> Unit,
     onVoid: (CollectionItem) -> Unit
 ) {
     if (rows.isEmpty()) return
@@ -476,6 +487,7 @@ private fun LazyListScope.entryGroup(
             onReceive = { onReceive(row) },
             onOpenWhatsApp = { onOpenWhatsApp(row) },
             onMarkReported = { onMarkReported(row) },
+            onPartyClick = { onPartyClick(row.customerId) },
             onVoid = { onVoid(row) }
         )
     }
@@ -607,6 +619,7 @@ private fun CollectionRow(
     onReceive: () -> Unit,
     onOpenWhatsApp: () -> Unit,
     onMarkReported: () -> Unit,
+    onPartyClick: () -> Unit,
     onVoid: () -> Unit
 ) {
     val shape = RoundedCornerShape(Radius.card)
@@ -673,7 +686,13 @@ private fun CollectionRow(
                         text = item.customerDisplayName,
                         style = AppType.subheading,
                         color = if (isReported) TextSecondary else TextDisplay,
-                        maxLines = 1
+                        maxLines = 1,
+                        // The name carries its own target: it opens that party's ledger, while the
+                        // rest of the row still opens the entry. Long-press selects from either.
+                        modifier = Modifier.combinedClickable(
+                            onClick = onPartyClick,
+                            onLongClick = onLongClick
+                        )
                     )
                     Text(
                         text = metaLine(item),

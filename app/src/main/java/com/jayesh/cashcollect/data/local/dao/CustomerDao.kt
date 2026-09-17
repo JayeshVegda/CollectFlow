@@ -27,6 +27,10 @@ interface CustomerDao {
     @Query("SELECT * FROM customers WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): CustomerEntity?
 
+    /** The party ledger observes its party, so a rename shows up without leaving the page. */
+    @Query("SELECT * FROM customers WHERE id = :id LIMIT 1")
+    fun observeById(id: Long): Flow<CustomerEntity?>
+
     @Query("SELECT * FROM customers WHERE LOWER(name) = LOWER(:name) LIMIT 1")
     suspend fun findByName(name: String): CustomerEntity?
 

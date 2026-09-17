@@ -1,6 +1,7 @@
 package com.jayesh.cashcollect.ui.detail
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,6 +83,7 @@ fun CollectionDetailScreen(
     onOpenWhatsAppAgain: (CollectionItem) -> Unit,
     onConfirmSent: (Long) -> Unit,
     onVoidAndReplace: (originalId: Long, reason: String, newAmountPaise: Long, note: String?) -> Unit,
+    onPartyClick: (Long) -> Unit = {},
     onBackClick: () -> Unit
 ) {
     if (collection == null) {
@@ -134,12 +136,13 @@ fun CollectionDetailScreen(
         ) {
             StatusBadge(status = collection.status)
 
-            // Customer Name
+            // Customer Name — tapping it opens this party's ledger.
             Text(
                 text = collection.customerDisplayName,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = NothingWhite
+                color = NothingWhite,
+                modifier = Modifier.clickable { onPartyClick(collection.customerId) }
             )
 
             // Amount

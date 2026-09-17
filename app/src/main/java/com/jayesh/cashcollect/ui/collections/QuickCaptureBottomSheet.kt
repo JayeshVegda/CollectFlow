@@ -88,11 +88,16 @@ fun QuickCaptureBottomSheet(
     sheetState: SheetState,
     commissionRatePerThousand: Int,
     recentCustomers: List<Customer> = emptyList(),
+    initialInput: String = "",
     onDismiss: () -> Unit,
     onConfirmSave: (customerName: String, amountPaise: Long, note: String?) -> Unit,
     onOpenFullForm: () -> Unit
 ) {
-    var rawInput by remember { mutableStateOf("") }
+    // A party page opens this sheet with the party already named, so the only thing left to type is
+    // the amount: "Sambhu " is placed in the field, cursor after it.
+    var rawInput by remember(initialInput) {
+        mutableStateOf(if (initialInput.isBlank()) "" else initialInput.trim() + " ")
+    }
     var noteInput by remember { mutableStateOf("") }
     val parsed = remember(rawInput) { SmartInputParser.parse(rawInput) }
 

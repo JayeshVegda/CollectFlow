@@ -20,6 +20,11 @@ class CustomerRepository(private val customerDao: CustomerDao) {
         }
     }
 
+    /** One party, observed — the party ledger's header. */
+    fun observeCustomer(id: Long): Flow<Customer?> {
+        return customerDao.observeById(id).map { it?.toDomain() }
+    }
+
     fun searchCustomers(query: String): Flow<List<Customer>> {
         return customerDao.search(query).map { list ->
             list.map { it.toDomain() }

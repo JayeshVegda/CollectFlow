@@ -67,7 +67,8 @@ import java.util.Locale
 @Composable
 fun HistoryRoute(
     viewModel: HistoryViewModel,
-    onItemClick: (Long) -> Unit
+    onItemClick: (Long) -> Unit,
+    onPartyClick: (Long) -> Unit
 ) {
     val context = LocalContext.current
     val items by viewModel.filteredItems.collectAsStateWithLifecycle()
@@ -84,6 +85,7 @@ fun HistoryRoute(
         sortOption = sortOption,
         onToggleSort = viewModel::toggleSort,
         onItemClick = onItemClick,
+        onPartyClick = onPartyClick,
         onExportCsvClick = { viewModel.exportCsv(context) }
     )
 }
@@ -99,6 +101,7 @@ fun HistoryScreen(
     sortOption: SortOption = SortOption.NEWEST,
     onToggleSort: () -> Unit = {},
     onItemClick: (Long) -> Unit,
+    onPartyClick: (Long) -> Unit = {},
     onExportCsvClick: () -> Unit
 ) {
     Scaffold(
@@ -231,7 +234,11 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(items, key = { it.id }) { item ->
-                        HistoryRow(item = item, onClick = { onItemClick(item.id) })
+                        HistoryRow(
+                            item = item,
+                            onClick = { onItemClick(item.id) },
+                            onPartyClick = { onPartyClick(item.customerId) }
+                        )
                     }
                 }
             }
@@ -240,7 +247,7 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun HistoryRow(item: CollectionItem, onClick: () -> Unit) {
+private fun HistoryRow(item: CollectionItem, onClick: () -> Unit, onPartyClick: () -> Unit) {
     val isVoided = item.status == CollectionStatus.VOIDED
     val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
 
@@ -261,7 +268,9 @@ private fun HistoryRow(item: CollectionItem, onClick: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = NothingWhite,
-                    textDecoration = if (isVoided) TextDecoration.LineThrough else null
+                    textDecoration = if (isVoided) TextDecoration.LineThrough else null,
+                    // Tapping the party name opens that party's ledger; the row still opens the entry.
+                    modifier = Modifier.clickable(onClick = onPartyClick)
                 )
                 StatusBadge(status = item.status)
             }
