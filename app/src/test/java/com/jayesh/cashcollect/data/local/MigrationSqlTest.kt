@@ -1,5 +1,6 @@
 package com.jayesh.cashcollect.data.local
 
+import com.jayesh.cashcollect.data.local.entity.SettingsEntity
 import com.jayesh.cashcollect.domain.model.AppSettings
 import com.jayesh.cashcollect.domain.template.MessageTemplateEngine
 import org.junit.Assert.assertEquals
@@ -41,7 +42,11 @@ class MigrationSqlTest {
 
     @Test
     fun `additive migrations only add columns and never drop or delete data`() {
-        val additive = AppDatabase.MIGRATION_1_2_NOTE_SQL +
+        // listOf(...) wraps the lone statement: `String + List<String>` is string concatenation in
+        // Kotlin, which would silently turn this into one string (and iterating it then yields
+        // characters, so the assertions would compare a Char against "ALTER TABLE").
+        val additive = listOf(AppDatabase.MIGRATION_1_2_NOTE_SQL) +
+            listOf(AppDatabase.MIGRATION_1_2_TEMPLATE_SQL) +
             AppDatabase.MIGRATION_2_3_STATEMENTS +
             AppDatabase.MIGRATION_3_4_STATEMENTS
 
