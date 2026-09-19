@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
 import com.jayesh.cashcollect.domain.state.CollectionStatus
+import com.jayesh.cashcollect.ui.common.AppScreenTitle
 import com.jayesh.cashcollect.ui.common.GlassSurface
 import com.jayesh.cashcollect.ui.common.StatusBadge
 import com.jayesh.cashcollect.ui.theme.NothingBlack
@@ -109,15 +110,7 @@ fun HistoryScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "HISTORY",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        color = NothingWhite
-                    )
-                },
+                title = { AppScreenTitle("History") },
                 actions = {
                     IconButton(onClick = onToggleSort) {
                         Icon(Icons.Default.SwapVert, contentDescription = "Sort", tint = NothingWhite)

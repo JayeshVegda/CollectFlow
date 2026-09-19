@@ -5,6 +5,9 @@ CollectFlow is a single-user, offline-first native Android app designed for high
 ## Key Features
 - **Offline-First & Local Storage:** Powered by Room SQLite. Zero servers, zero external dependencies, 100% private.
 - **Strict Integer Money Math:** Currency is stored strictly as integer paise (`Long`). Zero floating-point drift. Commission uses exact round-half-up integer arithmetic (`(amount * rate + 500) / 1000`).
+- **The Ledger Is Never Destroyed To Recover:** No destructive migration fallback. If the database
+  cannot be opened, the unopenable file is preserved and the newest automatic pre-update backup is
+  restored, with a note shown to the operator.
 - **Reliable WhatsApp Handoff:**
   - Cash receipt is committed to Room SQLite **before** the WhatsApp intent fires.
   - Supports standard WhatsApp (`com.whatsapp`) with automatic fallback to WhatsApp Business (`com.whatsapp.w4b`).
@@ -16,7 +19,10 @@ CollectFlow is a single-user, offline-first native Android app designed for high
 - **Built-in Crash Diagnostics & Recovery:**
   - Intercepts uncaught runtime exceptions across threads and displays a Nothing OS styled diagnostic screen in an isolated process.
   - Instant `[COPY LOG]` and `[CLEAR DATABASE & START FRESH]` recovery actions directly on the device.
-- **Encrypted Local Backup:** AES-256-GCM encrypted backup export and restore using Jetpack Security (Tink), plus CSV export with raw integer rupee columns.
+- **Encrypted Local Backup & Restore:** AES-256-GCM encrypted backup export and a working restore
+  through the system file picker (Settings → RESTORE). The encryption key resides in the device
+  Keystore, so a backup is restorable **on the phone that created it**; it cannot currently be opened
+  on a different phone. CSV export carries both exact paise integers and plain decimal rupees.
 - **Periodic Reminders:** WorkManager periodic reminder for unconfirmed collections awaiting WhatsApp confirmation.
 
 ## Template Tags

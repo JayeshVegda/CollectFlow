@@ -41,7 +41,6 @@ data class InsightsSummary(
     val monthlyCommissionPaise: Long,
     val monthlyCount: Int,
     val monthAvgPerDayPaise: Long,
-    val monthBestDayPaise: Long,
     val topCustomers: List<CustomerVolume>,
     val last7DaysTrend: List<DailyTrendBucket>,
     val last6MonthsTrend: List<MonthlyBucket>
@@ -190,7 +189,6 @@ object AnalyticsEngine {
             )
         }
 
-        val monthBestDay = trendBuckets.maxOfOrNull { it.totalPaise } ?: 0L
         val monthAvgPerDay = if (monthlyCount > 0) monthlyTotal / 30 else 0L
 
         return InsightsSummary(
@@ -206,7 +204,6 @@ object AnalyticsEngine {
             monthlyCommissionPaise = monthlyCommission,
             monthlyCount = monthlyCount,
             monthAvgPerDayPaise = monthAvgPerDay,
-            monthBestDayPaise = monthBestDay,
             topCustomers = topCustomers,
             last7DaysTrend = trendBuckets,
             last6MonthsTrend = monthBuckets

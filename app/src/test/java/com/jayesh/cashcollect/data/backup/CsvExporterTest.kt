@@ -35,19 +35,41 @@ class CsvExporterTest {
     )
 
     @Test
-    fun `header has twelve columns including Note`() {
-        val header = "ID,Customer Name,Customer Alias,Amount (Rupees),Commission (Rupees),Rate (per 1000),Status,Created At,Received At,Confirmed At,Void Reason,Note"
-        val columns = header.split(",").size
-        assertEquals(12, columns)
-        assertTrue(header.endsWith("Note"))
+    fun `header has fourteen columns and names both money representations`() {
+        val columns = CSV_HEADER.trim().split(",")
+        assertEquals(14, columns.size)
+        assertTrue(columns.contains("Amount (Paise)"))
+        assertTrue(columns.contains("Amount (Rupees)"))
+        assertTrue(columns.contains("Commission (Paise)"))
+        assertTrue(columns.contains("Commission (Rupees)"))
+        assertTrue(CSV_HEADER.endsWith("Note\n"))
     }
 
     @Test
-    fun `amounts are raw integers without thousands separators`() {
+    fun `amounts carry exact paise beside a separator-free decimal`() {
         val rows = buildCsvRows(listOf(item(amountPaise = 400_000_00L)), dateFormat)
         val columns = rows[0].split(",")
-        assertEquals("400000", columns[3]) // 4,00,000 would shift every column
-        assertEquals("1200", columns[4])
+        assertEquals("40000000", columns[3]) // 4,00,000 rupees, exact paise
+        assertEquals("400000.00", columns[4]) // no thousands separator, which would shift columns
+        assertEquals("120000", columns[5])
+        assertEquals("1200.00", columns[6])
+    }
+
+    @Test
+    fun `paise that are not a whole rupee survive the export`() {
+        // The regression this guards: `paise / 100` exported ₹1,200.50 as 1200, so the sheet could
+        // not be reconciled against the ledger.
+        assertEquals("1200.50", paiseToPlainRupees(120_050L))
+        assertEquals("1200.05", paiseToPlainRupees(120_005L))
+        assertEquals("120000.01", paiseToPlainRupees(12_000_001L))
+        assertEquals("0.07", paiseToPlainRupees(7L))
+        assertEquals("1.00", paiseToPlainRupees(100L))
+
+        val fields = splitCsvLine(
+            buildCsvRows(listOf(item(amountPaise = 120_050L)), dateFormat)[0]
+        )
+        assertEquals("120050", fields[3])
+        assertEquals("1200.50", fields[4])
     }
 
     @Test
@@ -57,16 +79,17 @@ class CsvExporterTest {
             dateFormat
         )
         val fields = splitCsvLine(rows[0])
-        assertEquals(12, fields.size)
+        assertEquals(14, fields.size)
         // "Half cash, half UPI" contains a comma, so it must stay one quoted field.
-        assertEquals("Half cash, half UPI", fields[11])
+        assertEquals("Half cash, half UPI", fields[13])
+        assertEquals("", fields[12])
     }
 
     @Test
     fun `void reason goes into its own column`() {
         val rows = buildCsvRows(listOf(item(voidReason = "CHEQUE DISHONOURED")), dateFormat)
         val fields = splitCsvLine(rows[0])
-        assertEquals("CHEQUE DISHONOURED", fields[10])
+        assertEquals("CHEQUE DISHONOURED", fields[12])
     }
 
     @Test
@@ -108,9 +131,9 @@ class CsvExporterTest {
     fun `missing optional timestamps are empty cells`() {
         val rows = buildCsvRows(listOf(item()), dateFormat)
         val fields = splitCsvLine(rows[0])
-        assertEquals(12, fields.size)
-        assertEquals("", fields[8]) // received_at
-        assertEquals("", fields[9]) // confirmed_at
-        assertEquals("1970-01-01 00:00:00", fields[7]) // created_at
+        assertEquals(14, fields.size)
+        assertEquals("", fields[10]) // received_at
+        assertEquals("", fields[11]) // confirmed_at
+        assertEquals("1970-01-01 00:00:00", fields[9]) // created_at
     }
 }

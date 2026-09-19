@@ -1,6 +1,5 @@
 package com.jayesh.cashcollect.ui.common
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,43 +81,9 @@ fun AmountText(
 }
 
 /**
- * A two-line stack: a title and a dimmed meta line. The app's most common row body, so it
- * lives here rather than being re-implemented per screen.
+ * REMOVED: `AppRowText` (a title + meta row) and `AppTitle` (a page-title helper) used to live here.
+ *
+ * Both were defined and never called anywhere in the app or its tests. `AppTitle` was also a second
+ * way to do what `AppScreenTitle` in `AppControls.kt` now does, and two ways to render a title is
+ * exactly how a design system drifts. They are in git history if either is ever wanted back.
  */
-@Composable
-fun AppRowText(
-    title: String,
-    meta: String?,
-    modifier: Modifier = Modifier,
-    titleColor: Color = TextDisplay,
-    strikethrough: Boolean = false
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = title,
-            style = AppType.subheading,
-            color = titleColor,
-            textDecoration = if (strikethrough) TextDecoration.LineThrough else null,
-            maxLines = 1
-        )
-        if (!meta.isNullOrBlank()) {
-            Text(
-                text = meta,
-                style = AppType.bodySm,
-                color = TextSecondary,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-/** A page title. One per screen, per the three-layer hierarchy rule. */
-@Composable
-fun AppTitle(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        modifier = modifier,
-        style = AppType.heading,
-        color = TextDisplay
-    )
-}

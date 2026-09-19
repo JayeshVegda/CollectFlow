@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.jayesh.cashcollect.domain.model.Customer
 import com.jayesh.cashcollect.domain.money.CommissionCalculator
 import com.jayesh.cashcollect.domain.money.Paise
+import com.jayesh.cashcollect.ui.common.AppScreenTitle
 import com.jayesh.cashcollect.ui.common.AmountKeypad
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingBlack
@@ -107,15 +108,7 @@ fun AddCollectionScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "NEW COLLECTION",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        color = NothingWhite
-                    )
-                },
+                title = { AppScreenTitle("New collection") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = NothingWhite)

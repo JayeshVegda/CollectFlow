@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Cash Collect</string>
+    <string name="app_name">CollectFlow</string>
     <string name="collections">Collections</string>
     <string name="history">History</string>
     <string name="settings">Settings</string>

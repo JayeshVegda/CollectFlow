@@ -28,14 +28,6 @@ object CollectionStateMachine {
     }
 
     /**
-     * Reopening WhatsApp should only be permitted in RECEIPT_CONFIRMED or PENDING,
-     * but does NOT alter the collection status.
-     */
-    fun canReopenWhatsApp(current: CollectionStatus): Boolean {
-        return current == CollectionStatus.RECEIPT_CONFIRMED || current == CollectionStatus.CONFIRMED
-    }
-
-    /**
      * A record can only be voided if a non-blank reason is supplied.
      */
     fun validateVoidReason(reason: String?): String {

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Status-bar small icon.
+
+  `setSmallIcon` needs a monochrome silhouette: the system masks the icon to a single colour, so
+  anything with its own background (the launcher foreground it used to be given) renders as a
+  solid blob. This is a stroke-only rupee mark on transparent, drawn in the 24dp status-bar grid,
+  matching the launcher mark so the notification and the app read as the same thing.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Top bar -->
+    <path
+        android:pathData="M5,5 H19"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="square" />
+
+    <!-- Crossbar -->
+    <path
+        android:pathData="M5,10.5 H19"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="square" />
+
+    <!-- Bowl, bulging right of the stem -->
+    <path
+        android:pathData="M11,5 A2.75,2.75 0 0 1 11,10.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8" />
+
+    <!-- Descending leg -->
+    <path
+        android:pathData="M11,10.5 L19,20"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="square" />
+</vector>

@@ -7,9 +7,18 @@ import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.CommissionCalculator
 import com.jayesh.cashcollect.domain.state.CollectionStateMachine
 import com.jayesh.cashcollect.domain.state.CollectionStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
+/**
+ * Every read flow maps to domain objects on a background dispatcher.
+ *
+ * `stateIn(viewModelScope, ...)` collects on the main dispatcher, so `map { it.toDomain() }` — which
+ * allocates one domain object per row — ran on the main thread for every row of history, on every
+ * database write. `flowOn` moves the query and the mapping off the frame-drawing thread.
+ */
 class CollectionRepository(
     private val database: AppDatabase
 ) {
@@ -17,42 +26,28 @@ class CollectionRepository(
     private val customerDao = database.customerDao()
 
     fun getOutstandingConfirmations(): Flow<List<CollectionItem>> {
-        return collectionDao.getOutstandingConfirmations().map { list ->
-            list.map { it.toDomain() }
-        }
+        return collectionDao.getOutstandingConfirmations()
+            .map { list -> list.map { it.toDomain() } }
+            .flowOn(Dispatchers.Default)
     }
 
     fun getPendingCollections(): Flow<List<CollectionItem>> {
-        return collectionDao.getPendingCollections().map { list ->
-            list.map { it.toDomain() }
-        }
+        return collectionDao.getPendingCollections()
+            .map { list -> list.map { it.toDomain() } }
+            .flowOn(Dispatchers.Default)
     }
 
     fun getAllHistory(): Flow<List<CollectionItem>> {
-        return collectionDao.getAllHistory().map { list ->
-            list.map { it.toDomain() }
-        }
+        return collectionDao.getAllHistory()
+            .map { list -> list.map { it.toDomain() } }
+            .flowOn(Dispatchers.Default)
     }
 
     /** Every entry for one party, newest first — the party ledger's list. */
     fun getCollectionsForCustomer(customerId: Long): Flow<List<CollectionItem>> {
-        return collectionDao.getByCustomer(customerId).map { list ->
-            list.map { it.toDomain() }
-        }
-    }
-
-    fun filterHistory(
-        status: CollectionStatus?,
-        fromTimestamp: Long?,
-        toTimestamp: Long?,
-        searchQuery: String?
-    ): Flow<List<CollectionItem>> {
-        return collectionDao.filterHistory(
-            status = status?.name,
-            fromTimestamp = fromTimestamp,
-            toTimestamp = toTimestamp,
-            searchQuery = searchQuery?.trim()?.takeIf { it.isNotEmpty() }
-        ).map { list -> list.map { it.toDomain() } }
+        return collectionDao.getByCustomer(customerId)
+            .map { list -> list.map { it.toDomain() } }
+            .flowOn(Dispatchers.Default)
     }
 
     suspend fun getCollectionById(id: Long): CollectionItem? {
@@ -97,19 +92,34 @@ class CollectionRepository(
 
     /**
      * Non-negotiable: persists receipt state to Room BEFORE any WhatsApp intent fires.
+     *
+     * Only PENDING becomes RECEIPT_CONFIRMED. Any other state has a defined answer rather than a
+     * silent no-op that still reports success to the caller:
+     *  - already RECEIPT_CONFIRMED / CONFIRMED — the cash is in hand either way, so returning the
+     *    existing row is genuine idempotency. Re-committing is deliberately skipped because it
+     *    would overwrite `received_at` and rewrite the day the collection belongs to.
+     *  - VOIDED — fails loudly. A voided row can still be on screen (it may have been voided from
+     *    another screen or by the quick-swipe), and reporting "receipt recorded" for it would tell
+     *    the operator that cash was banked against an entry that no longer exists.
      */
     suspend fun markReceivedAndCommit(id: Long): CollectionItem {
         return database.withTransaction {
             val entity = collectionDao.getById(id)
                 ?: throw IllegalArgumentException("Collection record #$id not found")
 
-            val currentStatus = CollectionStatus.valueOf(entity.status)
-            if (currentStatus == CollectionStatus.PENDING) {
-                val updated = entity.copy(
-                    status = CollectionStatus.RECEIPT_CONFIRMED.name,
-                    receivedAt = System.currentTimeMillis()
+            when (CollectionStatus.valueOf(entity.status)) {
+                CollectionStatus.PENDING -> collectionDao.update(
+                    entity.copy(
+                        status = CollectionStatus.RECEIPT_CONFIRMED.name,
+                        receivedAt = System.currentTimeMillis()
+                    )
                 )
-                collectionDao.update(updated)
+
+                CollectionStatus.RECEIPT_CONFIRMED, CollectionStatus.CONFIRMED -> Unit
+
+                CollectionStatus.VOIDED -> throw IllegalStateException(
+                    "Entry #$id was voided, so its cash cannot be recorded. Refresh the list."
+                )
             }
 
             collectionDao.getWithCustomerById(id)?.toDomain()

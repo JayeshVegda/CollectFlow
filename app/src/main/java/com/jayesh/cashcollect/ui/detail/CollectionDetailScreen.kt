@@ -56,7 +56,9 @@ import androidx.compose.ui.unit.sp
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
 import com.jayesh.cashcollect.domain.state.CollectionStatus
+import com.jayesh.cashcollect.ui.common.AppScreenTitle
 import com.jayesh.cashcollect.ui.common.ConfirmBottomSheet
+import com.jayesh.cashcollect.ui.common.EditCollectionBottomSheet
 import com.jayesh.cashcollect.ui.common.StatusBadge
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingAmberBg
@@ -83,6 +85,8 @@ fun CollectionDetailScreen(
     onOpenWhatsAppAgain: (CollectionItem) -> Unit,
     onConfirmSent: (Long) -> Unit,
     onVoidAndReplace: (originalId: Long, reason: String, newAmountPaise: Long, note: String?) -> Unit,
+    onSaveEdit: (customerName: String, amountPaise: Long, dateMillis: Long, note: String?) -> Unit,
+    onDeleteEntry: (Long) -> Unit,
     onPartyClick: (Long) -> Unit = {},
     onBackClick: () -> Unit
 ) {
@@ -95,11 +99,13 @@ fun CollectionDetailScreen(
 
     var showConfirmSheet by remember { mutableStateOf(false) }
     var showVoidDialog by remember { mutableStateOf(false) }
+    var showEditSheet by remember { mutableStateOf(false) }
     var voidReason by remember { mutableStateOf("") }
     var newAmountRupees by remember { mutableStateOf("") }
     var newNote by remember { mutableStateOf(collection.note ?: "") }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
 
@@ -108,18 +114,25 @@ fun CollectionDetailScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "ENTRY #${collection.id}",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = NothingWhite
-                    )
-                },
+                title = { AppScreenTitle("Entry #${collection.id}") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = NothingWhite)
+                    }
+                },
+                actions = {
+                    // Correcting an entry — party, amount, date or note — lives here because this
+                    // page is where an entry is opened to be fixed. A VOIDED entry is the audit
+                    // trail of a correction that already happened, so it stays immutable and the
+                    // action is hidden rather than failing on tap.
+                    if (collection.status != CollectionStatus.VOIDED) {
+                        IconButton(onClick = { showEditSheet = true }) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Correct entry",
+                                tint = NothingWhite
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = NothingBlack)
@@ -450,6 +463,28 @@ fun CollectionDetailScreen(
             dismissButton = {
                 TextButton(onClick = { showVoidDialog = false }) {
                     Text("CANCEL", color = NothingGray)
+                }
+            }
+        )
+    }
+
+    if (showEditSheet) {
+        EditCollectionBottomSheet(
+            collection = collection,
+            sheetState = editSheetState,
+            onDismiss = {
+                scope.launch { editSheetState.hide() }.invokeOnCompletion { showEditSheet = false }
+            },
+            onSave = { name, amountPaise, dateMillis, note ->
+                scope.launch { editSheetState.hide() }.invokeOnCompletion {
+                    showEditSheet = false
+                    onSaveEdit(name, amountPaise, dateMillis, note)
+                }
+            },
+            onDelete = {
+                scope.launch { editSheetState.hide() }.invokeOnCompletion {
+                    showEditSheet = false
+                    onDeleteEntry(collection.id)
                 }
             }
         )

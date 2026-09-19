@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 and below (android:fullBackupContent).
+
+  Defensive: allowBackup is already off, so nothing here runs today. It exists so that turning
+  allowBackup back on cannot leak the ledger through auto-backup or device transfer.
+
+  Everything the app writes is excluded, because every file here contains either money records or
+  the encryption material for them.
+-->
+<full-backup-content>
+    <!-- The cash ledger itself. -->
+    <exclude domain="database" path="." />
+    <!-- Encrypted backups, pre-update copies and preserved databases. -->
+    <exclude domain="file" path="." />
+    <!-- WorkManager state and any preferences. -->
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="root" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>

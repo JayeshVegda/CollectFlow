@@ -70,7 +70,9 @@ import com.jayesh.cashcollect.ui.theme.NothingMuted
 import com.jayesh.cashcollect.ui.theme.NothingWhite
 import com.jayesh.cashcollect.widget.CashCollectWidgetProvider
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 sealed class Screen {
@@ -88,9 +90,75 @@ sealed class Screen {
     data class PartyLedger(val customerId: Long) : Screen()
 }
 
+/*
+ * Back-stack tokens
+ * -----------------
+ * The stack is held as plain strings so `rememberSaveable` can persist it with no custom `Saver`,
+ * which is the same reason the old code used a token — the difference is that a *list* of tokens is
+ * a stack, and a single token was not.
+ *
+ * [encode] is the only producer of these values; [decodeScreen] is the only consumer.
+ */
+
+private const val TOKEN_COLLECTIONS = "collections"
+private const val TOKEN_INSIGHTS = "insights"
+private const val TOKEN_HISTORY = "history"
+private const val TOKEN_SETTINGS = "settings"
+private const val TOKEN_ADD = "add"
+private const val TOKEN_DETAIL_PREFIX = "detail:"
+private const val TOKEN_PARTY_PREFIX = "party:"
+
+/** The four tab destinations. Selecting one resets the stack; it is not a drill-in. */
+private fun Screen.isTab(): Boolean =
+    this is Screen.Collections || this is Screen.Insights ||
+        this is Screen.History || this is Screen.Settings
+
+private fun Screen.encode(): String {
+    val screen = this
+    return when (screen) {
+        Screen.Collections -> TOKEN_COLLECTIONS
+        Screen.Insights -> TOKEN_INSIGHTS
+        Screen.History -> TOKEN_HISTORY
+        Screen.Settings -> TOKEN_SETTINGS
+        Screen.AddCollection -> TOKEN_ADD
+        is Screen.Detail -> TOKEN_DETAIL_PREFIX + screen.collectionId
+        is Screen.PartyLedger -> TOKEN_PARTY_PREFIX + screen.customerId
+    }
+}
+
+/**
+ * Decodes one token, falling back to the queue.
+ *
+ * Unrecognised or malformed tokens resolve to [Screen.Collections] rather than throwing. This runs
+ * while restoring state written by an earlier process, so a token from an older build — or a
+ * corrupted bundle — must never crash the app or land the operator on "Collection not found".
+ */
+private fun decodeScreen(token: String): Screen = when {
+    token == TOKEN_INSIGHTS -> Screen.Insights
+    token == TOKEN_HISTORY -> Screen.History
+    token == TOKEN_SETTINGS -> Screen.Settings
+    token == TOKEN_ADD -> Screen.AddCollection
+    token.startsWith(TOKEN_DETAIL_PREFIX) ->
+        parsePositiveId(token, TOKEN_DETAIL_PREFIX)?.let { Screen.Detail(it) } ?: Screen.Collections
+    token.startsWith(TOKEN_PARTY_PREFIX) ->
+        parsePositiveId(token, TOKEN_PARTY_PREFIX)?.let { Screen.PartyLedger(it) } ?: Screen.Collections
+    else -> Screen.Collections
+}
+
+private fun parsePositiveId(token: String, prefix: String): Long? =
+    token.removePrefix(prefix).toLongOrNull()?.takeIf { it > 0L }
+
 class MainActivity : ComponentActivity() {
 
-    private val deepLinkFlow = MutableStateFlow<Intent?>(null)
+    /**
+     * Deep links arrive as one-shot events, not as state.
+     *
+     * This used to be a `MutableStateFlow<Intent?>`, and `StateFlow` de-duplicates by `equals`. Two
+     * taps on the same notification action produce *equal* `Intent`s, so the second tap was
+     * swallowed: the entry stayed unreported and the action looked broken. A buffered channel
+     * delivers every intent exactly once.
+     */
+    private val deepLinkEvents = Channel<Intent>(Channel.BUFFERED)
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -107,7 +175,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        deepLinkFlow.value = intent
+        deepLinkEvents.trySend(intent)
     }
 
     private fun requestNotificationPermissionIfNeeded() {
@@ -133,9 +201,15 @@ class MainActivity : ComponentActivity() {
         val openAddDirectly = intent.getBooleanExtra("EXTRA_OPEN_ADD", false)
         val openQuickCaptureDirectly = intent.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false)
 
-        // The launch intent goes through the same flow as a warm one, so a notification action
+        // The launch intent goes through the same path as a warm one, so a notification action
         // behaves identically whether the app was already open or is starting cold.
-        deepLinkFlow.value = intent
+        //
+        // A genuine cold start only: on a configuration change the back stack is restored by
+        // `rememberSaveable`, and replaying the launch intent would push the same screen a second
+        // time or reopen the capture sheet the operator had already dismissed.
+        if (savedInstanceState == null) {
+            deepLinkEvents.trySend(intent)
+        }
 
         setContent {
             CompositionLocalProvider(
@@ -164,47 +238,54 @@ class MainActivity : ComponentActivity() {
 
                 val settingsViewModel: SettingsViewModel = viewModel(
                     factory = SettingsViewModel.Factory(
-                        settingsRepo = app.settingsRepository
+                        settingsRepo = app.settingsRepository,
+                        backupManager = app.backupManager
                     )
                 )
 
-                var screenToken by rememberSaveable {
+                // ---------------------------------------------------------------------------
+                // Navigation: one app-owned back stack.
+                //
+                // This replaces a `screenToken` string plus two loose Longs. That shape could not
+                // express "where did I come from", so every back action was hardcoded to the queue
+                // and a Detail -> Party -> back sequence jumped two levels at once. It also could
+                // not survive process death *as a stack*, because nothing recorded the order.
+                //
+                // This is the same principle Navigation 3 is built on — the back stack is app-owned
+                // state that the UI renders — implemented without adding a dependency.
+                // ---------------------------------------------------------------------------
+                var backStack by rememberSaveable {
                     mutableStateOf(
-                        when {
-                            initialCollectionId > 0 -> "detail"
-                            openAddDirectly -> "add"
-                            else -> "collections"
-                        }
+                        listOf(
+                            when {
+                                initialCollectionId > 0L -> Screen.Detail(initialCollectionId).encode()
+                                openAddDirectly -> Screen.AddCollection.encode()
+                                else -> Screen.Collections.encode()
+                            }
+                        )
                     )
                 }
-                var detailId by rememberSaveable { mutableStateOf(initialCollectionId) }
-                var partyCustomerId by rememberSaveable { mutableStateOf(-1L) }
-                val currentScreen: Screen = remember(screenToken, detailId, partyCustomerId) {
-                    when (screenToken) {
-                        "detail" -> Screen.Detail(detailId)
-                        "party" -> Screen.PartyLedger(partyCustomerId)
-                        "add" -> Screen.AddCollection
-                        "insights" -> Screen.Insights
-                        "history" -> Screen.History
-                        "settings" -> Screen.Settings
-                        else -> Screen.Collections
+                val currentScreen: Screen = remember(backStack) { decodeScreen(backStack.last()) }
+
+                val goTo: (Screen) -> Unit = { target ->
+                    backStack = if (target.isTab()) {
+                        // Switching tabs starts that tab cleanly: backing out of a tab should leave
+                        // the app, not replay a trail of previously visited tabs.
+                        listOf(target.encode())
+                    } else {
+                        // A drill-in stacks, so back returns to whatever opened it.
+                        backStack + target.encode()
                     }
                 }
-                val goTo: (Screen) -> Unit = { target ->
-                    screenToken = when (target) {
-                        is Screen.Detail -> {
-                            detailId = target.collectionId
-                            "detail"
-                        }
-                        is Screen.PartyLedger -> {
-                            partyCustomerId = target.customerId
-                            "party"
-                        }
-                        is Screen.AddCollection -> "add"
-                        is Screen.Insights -> "insights"
-                        is Screen.History -> "history"
-                        is Screen.Settings -> "settings"
-                        is Screen.Collections -> "collections"
+
+                // Reads only `backStack`, so it stays correct even when captured by a long-lived
+                // effect rather than being recreated on every recomposition.
+                val goBack: () -> Unit = {
+                    backStack = when {
+                        backStack.size > 1 -> backStack.dropLast(1)
+                        decodeScreen(backStack.last()) !is Screen.Collections ->
+                            listOf(Screen.Collections.encode())
+                        else -> backStack
                     }
                 }
 
@@ -215,33 +296,38 @@ class MainActivity : ComponentActivity() {
                 // tap on the ledger and then straight to the amount.
                 var quickCapturePrefill by rememberSaveable { mutableStateOf("") }
 
-                val deepLinkIntent by deepLinkFlow.collectAsStateWithLifecycle()
-                LaunchedEffect(deepLinkIntent) {
-                    val i = deepLinkIntent ?: return@LaunchedEffect
-                    val collectionId = i.getLongExtra("EXTRA_COLLECTION_ID", -1L)
-                    val markReportedId = i.getLongExtra(
-                        AppNotificationManager.EXTRA_MARK_REPORTED_ID,
-                        -1L
-                    )
-                    when {
-                        // One tap on the notification's "YES, REPORTED" action closes the loop:
-                        // the entry moves to REPORTED and the queue is re-shown.
-                        markReportedId > 0L -> {
-                            collectViewModel.confirmSent(this@MainActivity, markReportedId)
-                            goTo(Screen.Collections)
+                // Collected as events, in order, once each. `LaunchedEffect(Unit)` is correct here
+                // precisely because the channel — not this composition — owns the queue of intents.
+                LaunchedEffect(Unit) {
+                    deepLinkEvents.receiveAsFlow().collect { i ->
+                        val collectionId = i.getLongExtra("EXTRA_COLLECTION_ID", -1L)
+                        val markReportedId = i.getLongExtra(
+                            AppNotificationManager.EXTRA_MARK_REPORTED_ID,
+                            -1L
+                        )
+                        when {
+                            // One tap on the notification's "YES, REPORTED" action closes the loop:
+                            // the entry moves to REPORTED and the queue is re-shown.
+                            markReportedId > 0L -> {
+                                collectViewModel.confirmSent(this@MainActivity, markReportedId)
+                                goTo(Screen.Collections)
+                            }
+                            collectionId > 0L -> goTo(Screen.Detail(collectionId))
+                            i.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false) -> {
+                                goTo(Screen.Collections)
+                                shouldOpenQuickCapture = true
+                            }
+                            i.getBooleanExtra("EXTRA_OPEN_ADD", false) -> goTo(Screen.AddCollection)
                         }
-                        collectionId > 0 -> goTo(Screen.Detail(collectionId))
-                        i.getBooleanExtra("EXTRA_OPEN_QUICK_CAPTURE", false) -> {
-                            goTo(Screen.Collections)
-                            shouldOpenQuickCapture = true
-                        }
-                        i.getBooleanExtra("EXTRA_OPEN_ADD", false) -> goTo(Screen.AddCollection)
                     }
-                    deepLinkFlow.value = null
                 }
 
-                BackHandler(enabled = currentScreen !is Screen.Collections) {
-                    goTo(Screen.Collections)
+                // Back pops the stack. At the root of a tab it returns to the queue, and on the
+                // queue itself the handler is disabled so back leaves the app — the Android
+                // convention, and previously impossible: every screen intercepted back, so the app
+                // could never be exited with the gesture at all.
+                BackHandler(enabled = backStack.size > 1 || currentScreen !is Screen.Collections) {
+                    goBack()
                 }
 
                 val historyList by historyViewModel.historyList.collectAsStateWithLifecycle()
@@ -368,7 +454,7 @@ class MainActivity : ComponentActivity() {
                                     onCheckDuplicate = { customerId, amountPaise ->
                                         app.collectionRepository.checkRecentDuplicate(customerId, amountPaise)
                                     },
-                                    onBackClick = { goTo(Screen.Collections) }
+                                    onBackClick = goBack
                                 )
                             }
 
@@ -395,10 +481,31 @@ class MainActivity : ComponentActivity() {
                                             onSuccess = { goTo(Screen.Collections) }
                                         )
                                     },
+                                    onSaveEdit = { name, amountPaise, dateMillis, note ->
+                                        // `screen` is smart-cast to Screen.Detail here, so its id is
+                                        // the non-null one being displayed; `item` above is the
+                                        // nullable result of find {}.
+                                        collectViewModel.updateCollection(
+                                            this@MainActivity,
+                                            screen.collectionId,
+                                            name,
+                                            amountPaise,
+                                            dateMillis,
+                                            note
+                                        )
+                                    },
+                                    onDeleteEntry = { id ->
+                                        collectViewModel.deleteCollection(this@MainActivity, id)
+                                        // The entry no longer exists, so staying here would render
+                                        // "Collection not found". The queue is the right place to
+                                        // land: the entry that was deleted is not somewhere to go
+                                        // back to.
+                                        goTo(Screen.Collections)
+                                    },
                                     onPartyClick = { customerId ->
                                         goTo(Screen.PartyLedger(customerId))
                                     },
-                                    onBackClick = { goTo(Screen.Collections) }
+                                    onBackClick = goBack
                                 )
                             }
 
@@ -413,7 +520,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 PartyLedgerRoute(
                                     viewModel = partyViewModel,
-                                    onBackClick = { goTo(Screen.Collections) },
+                                    onBackClick = goBack,
                                     onEntryClick = { id -> goTo(Screen.Detail(id)) },
                                     onNewEntryClick = { name ->
                                         quickCapturePrefill = name
@@ -454,14 +561,10 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                     },
-                                    onRestoreBackupClick = {
-                                        Toast.makeText(
-                                            this@MainActivity,
-                                            "To restore, copy the backup file to the backups folder or import via file manager.",
-                                            Toast.LENGTH_LONG
-                                        ).show()
+                                    onRestoreBackup = { uri ->
+                                        settingsViewModel.restoreBackup(this@MainActivity, uri)
                                     },
-                                    onBackClick = { goTo(Screen.Collections) }
+                                    onBackClick = goBack
                                 )
                             }
                         }

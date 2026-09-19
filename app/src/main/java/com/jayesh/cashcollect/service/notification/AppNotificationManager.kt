@@ -87,7 +87,7 @@ class AppNotificationManager(private val context: Context) {
 
         // Generic public notification for lock screen privacy
         val publicNotification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Cash Collection")
             .setContentText("Receipt recorded. Tap to open.")
             .setContentIntent(openPendingIntent)
@@ -96,12 +96,12 @@ class AppNotificationManager(private val context: Context) {
 
         // Detailed notification for unlocked view, with the one-tap report action.
         val detailedNotification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Reported $amountStr?")
             .setContentText(collection.customerDisplayName + " · cash in hand")
             .setContentIntent(openPendingIntent)
             .addAction(
-                R.drawable.ic_launcher_foreground,
+                R.drawable.ic_notification,
                 "YES, REPORTED",
                 markReportedPendingIntent
             )
@@ -142,7 +142,7 @@ class AppNotificationManager(private val context: Context) {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Outstanding Receipts")
             .setContentText("$unconfirmedCount cash collection(s) still need a WhatsApp receipt.")
             .setContentIntent(pendingIntent)

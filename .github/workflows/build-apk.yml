@@ -29,22 +29,35 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Prepare signing keystore
+      # A release APK must be signed with the SAME key every time. Android refuses to
+      # update-install an APK signed by a different key, so generating a fresh key per run silently
+      # forces "uninstall first" — which deletes the ledger. No key, no build.
+      - name: Verify signing keystore is present
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          mkdir -p keystore
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            printf '%s' "$KEYSTORE_BASE64" | base64 -d > keystore/collectflow.jks
-          else
-            echo "No KEYSTORE_BASE64 secret; generating an ephemeral debug keystore."
-            keytool -genkeypair -v \
-              -keystore keystore/collectflow.jks \
-              -storepass collectflow -keypass collectflow \
-              -alias collectflow -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=CollectFlow, OU=Dev, O=CollectFlow, L=NA, S=NA, C=IN"
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "::error title=Signing keystore missing::KEYSTORE_BASE64 is not set. Refusing to build: an ephemeral key would make every published APK unable to update-install over the previous one."
+            {
+              echo "## Release blocked - no signing keystore"
+              echo ""
+              echo "This workflow used to generate a new keystore whenever KEYSTORE_BASE64 was absent."
+              echo "Android will not update-install an APK signed by a different key, so every published"
+              echo "release required uninstalling the app first - which deletes the ledger."
+              echo ""
+              echo "### To fix"
+              echo "1. Create the keystore once, and keep it safe (losing it means the same problem again):"
+              echo "   keytool -genkeypair -keystore collectflow.jks -alias collectflow -keyalg RSA -keysize 2048 -validity 10000"
+              echo "2. Add repository secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD."
+              echo "   base64 -w0 collectflow.jks    # paste the output into KEYSTORE_BASE64"
+              echo "3. Re-run this workflow."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
-          ls -lh keystore/
+          mkdir -p keystore
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > keystore/collectflow.jks
+          ls -lh keystore/collectflow.jks
 
       - name: Run Unit Tests
         env:

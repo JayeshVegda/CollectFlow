@@ -32,6 +32,9 @@ interface SettingsDao {
     @Query("UPDATE settings SET message_template = :template WHERE id = 1")
     suspend fun updateMessageTemplate(template: String)
 
+    @Query("UPDATE settings SET notification_delay_ms = :delayMs WHERE id = 1")
+    suspend fun updateNotificationDelay(delayMs: Int)
+
     @Query("UPDATE settings SET last_backup_at = :timestamp WHERE id = 1")
     suspend fun updateLastBackupTimestamp(timestamp: Long)
 }

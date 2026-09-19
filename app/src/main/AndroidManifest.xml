@@ -9,9 +9,23 @@
         <package android:name="com.whatsapp.w4b" />
     </queries>
 
+    <!--
+        allowBackup is OFF deliberately.
+
+        This database is the operator's cash ledger — party names, amounts, the recipient WhatsApp
+        number. With backup on, Android uploads all of it to Google's cloud, and device-to-device
+        transfer copies it around, without the operator being told.
+
+        The app has its own first-class backup instead: an AES-256-GCM encrypted export
+        (Settings > BACK UP NOW) with a working restore. The rules referenced below are kept as a
+        second line of defence, so that flipping allowBackup back on cannot silently expose the
+        ledger.
+    -->
     <application
         android:name=".CashCollectApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

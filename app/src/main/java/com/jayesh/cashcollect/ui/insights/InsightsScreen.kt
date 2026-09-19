@@ -23,6 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +39,7 @@ import com.jayesh.cashcollect.domain.analytics.DailyTrendBucket
 import com.jayesh.cashcollect.domain.analytics.MonthlyBucket
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
+import com.jayesh.cashcollect.ui.common.AppScreenTitle
 import com.jayesh.cashcollect.ui.common.GlassMetricRow
 import com.jayesh.cashcollect.ui.common.GlassSurface
 import com.jayesh.cashcollect.ui.theme.NothingBlack
@@ -48,29 +51,28 @@ import com.jayesh.cashcollect.ui.theme.NothingGreen
 import com.jayesh.cashcollect.ui.theme.NothingMuted
 import com.jayesh.cashcollect.ui.theme.NothingRed
 import com.jayesh.cashcollect.ui.theme.NothingWhite
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InsightsScreen(
     collections: List<CollectionItem>
 ) {
-    val insights = remember(collections) { AnalyticsEngine.computeInsights(collections) }
+    // Analytics makes several full passes over the ledger — day buckets, month buckets, a per-party
+    // map — and it was recomputed inside `remember` on the frame that draws this screen, for every
+    // database write. It now runs on a background dispatcher, keyed on the ledger it was given.
+    val emptyInsights = remember { AnalyticsEngine.computeInsights(emptyList()) }
+    val insights by produceState(initialValue = emptyInsights, key1 = collections) {
+        value = withContext(Dispatchers.Default) { AnalyticsEngine.computeInsights(collections) }
+    }
 
     Scaffold(
         containerColor = NothingBlack,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "INSIGHTS",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        fontSize = 17.sp,
-                        color = NothingWhite
-                    )
-                },
+                title = { AppScreenTitle("Insights") },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = NothingBlack)
             )
         }

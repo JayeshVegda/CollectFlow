@@ -14,6 +14,7 @@ import com.jayesh.cashcollect.domain.model.Customer
 import com.jayesh.cashcollect.service.notification.AppNotificationManager
 import com.jayesh.cashcollect.service.whatsapp.WhatsAppLauncher
 import com.jayesh.cashcollect.widget.CashCollectWidgetProvider
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,12 +48,19 @@ class CollectViewModel(
         private const val RECENT_CUSTOMER_LIMIT = 20
     }
 
-    val todayStats: StateFlow<TodayStats> = collectionRepo.getAllHistory()
+    /**
+     * One subscription to the whole ledger, shared by every figure derived from it.
+     *
+     * `todayStats` and `doneTodayList` are both views of the same table. Collecting
+     * `getAllHistory()` once per derivation meant two queries, two mappings and two Room
+     * invalidation streams re-running on every write, for exactly the same rows.
+     */
+    private val allHistory: StateFlow<List<CollectionItem>> = collectionRepo.getAllHistory()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val todayStats: StateFlow<TodayStats> = allHistory
         .map { list ->
-            val todayStart = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
+            val todayStart = startOfToday()
 
             val todayRealized = list.filter {
                 (it.status == CollectionStatus.RECEIPT_CONFIRMED || it.status == CollectionStatus.CONFIRMED) &&
@@ -70,20 +78,20 @@ class CollectViewModel(
                 pendingCount = todayPending.size
             )
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TodayStats())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayStats())
 
     val outstandingList: StateFlow<List<CollectionItem>> = collectionRepo.getOutstandingConfirmations()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val pendingList: StateFlow<List<CollectionItem>> = collectionRepo.getPendingCollections()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
      * Entries that are collected AND already reported today — the DONE bucket on the Today
      * screen. Without this the operator had no way to see what they had finished today,
      * only an aggregate count.
      */
-    val doneTodayList: StateFlow<List<CollectionItem>> = collectionRepo.getAllHistory()
+    val doneTodayList: StateFlow<List<CollectionItem>> = allHistory
         .map { list ->
             val todayStart = startOfToday()
             list.filter {
@@ -91,7 +99,7 @@ class CollectViewModel(
                     (it.receivedAt ?: it.createdAt) >= todayStart
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private fun startOfToday(): Long = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
@@ -102,7 +110,7 @@ class CollectViewModel(
 
     val commissionRate: StateFlow<Int> = settingsRepo.getSettings()
         .map { it.commissionRatePerThousand }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 3)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 3)
 
     /**
      * Most recently used parties, for the Quick Capture name pills.
@@ -114,7 +122,7 @@ class CollectViewModel(
      */
     val recentCustomers: StateFlow<List<Customer>> =
         customerRepo.getRecentCustomers(RECENT_CUSTOMER_LIMIT)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _isQuickCaptureOpen = MutableStateFlow(false)
     val isQuickCaptureOpen: StateFlow<Boolean> = _isQuickCaptureOpen.asStateFlow()
@@ -177,10 +185,40 @@ class CollectViewModel(
                 }
             dismissConfirm()
             CashCollectWidgetProvider.notifyDataChanged(context)
-            notificationManager.showImmediateReceiptNotification(committed)
+            scheduleReceiptNudge(committed)
 
             val settings = settingsRepo.getSettingsSync()
             openWhatsAppInternal(context, committed, settings)
+        }
+    }
+
+    /**
+     * Posts the "Reported?" prompt after the delay configured in Settings.
+     *
+     * The delay exists because committing a receipt opens WhatsApp at the same instant: firing
+     * the prompt immediately drops a notification over the app the operator is about to type in,
+     * which is why the default is a few seconds rather than zero.
+     *
+     * The entry is re-read before posting, so an entry reported or voided during the wait is
+     * never nagged about — the database, not this coroutine, decides whether the prompt is still
+     * owed.
+     *
+     * The wait lives in-process. If Android kills the app while WhatsApp is in front, this prompt
+     * is dropped; the periodic [com.jayesh.cashcollect.service.reminder.UnconfirmedReminderWorker]
+     * is the durable backstop that catches anything left behind. Choosing a WorkManager
+     * `initialDelay` instead was rejected deliberately: WorkManager's scheduling latency is not
+     * bounded tightly enough to honour a 3–5 second promise.
+     */
+    private fun scheduleReceiptNudge(collection: CollectionItem) {
+        viewModelScope.launch {
+            val delayMs = runCatching { settingsRepo.getSettingsSync().notificationDelayMs }
+                .getOrDefault(AppSettings.DEFAULT_NOTIFICATION_DELAY_MS)
+            if (delayMs > 0) delay(delayMs.toLong())
+
+            val current = runCatching { collectionRepo.getCollectionById(collection.id) }.getOrNull()
+            if (current != null && current.status == CollectionStatus.RECEIPT_CONFIRMED) {
+                notificationManager.showImmediateReceiptNotification(current)
+            }
         }
     }
 

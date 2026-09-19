@@ -26,8 +26,14 @@
    - Dual-step dispatch confirmation: A receipt is saved to Room first (`PENDING`), marked `RECEIPT_CONFIRMED` when cash is received in hand, and moved to `CONFIRMED` after the user confirms dispatch.
 3. **Crash-Proof Startup & Diagnostics:**
    - Always wrap root Compose in `CompositionLocalProvider(LocalLifecycleOwner provides this)`.
-   - `AppDatabase` performs proactive startup warm-up with automatic database reset if SQLite schema mismatch or corruption occurs.
-   - Dedicated `CrashHandler` captures uncaught exceptions and launches `CrashReportActivity` in an isolated `:crash` process.
+   - `AppDatabase` never destroys the ledger to recover. There is **no**
+     `fallbackToDestructiveMigration()`: a missing migration throws, and `buildDatabase` answers with
+     a non-destructive ladder — preserve the unopenable file, restore the newest automatic
+     pre-update backup, and record a note the UI can show (`consumeRecoveryNote`). If you add a
+     migration, add the matching `ALL_MIGRATIONS` entry; `MigrationSqlTest` asserts the chain 1→6
+     has no gaps, because a gap is precisely what used to wipe the database.
+   - Dedicated `CrashHandler` captures uncaught exceptions and launches `CrashReportActivity` in an
+     isolated `:crash` process.
 
 ---
 
@@ -81,7 +87,14 @@ CollectFlow/
 
 ### B. Database Schema & Auto-Recovery (`AppDatabase.kt`)
 - Room SQLite database with tables: `collections`, `customers`, `settings`.
-- If an older or corrupt database is detected at launch, `AppDatabase.getInstance()` automatically resets the local database to guarantee crash-free startup.
+- **Never destroys the operator's data to recover.** `fallbackToDestructiveMigration()` is
+  deliberately absent. If the database cannot be opened, `buildDatabase()` preserves the
+  unopenable file in `preserved_databases/`, restores the newest automatic backup from
+  `pre_update_backups/`, and writes a note that the UI reads once via `consumeRecoveryNote()`.
+- `exportSchema = true` with `room.schemaLocation`, so migrations can be diffed against the schema
+  the database actually had.
+- Recovery is deliberate only: `resetDatabase()` is reachable solely from the crash screen, and even
+  then it copies the existing file aside first.
 
 ### C. Gestures & Entry Management (`CollectionsScreen.kt`)
 - Material 3 `SwipeToDismissBox`:

@@ -11,9 +11,6 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface CustomerDao {
 
-    @Query("SELECT * FROM customers ORDER BY last_used_at DESC")
-    fun getAll(): Flow<List<CustomerEntity>>
-
     @Query("SELECT * FROM customers ORDER BY last_used_at DESC LIMIT :limit")
     fun getRecent(limit: Int = 10): Flow<List<CustomerEntity>>
 

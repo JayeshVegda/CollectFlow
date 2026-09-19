@@ -74,6 +74,9 @@ android {
 
     buildFeatures {
         compose = true
+        // BuildConfig is opt-in from AGP 8.0 onward. The crash report reads VERSION_NAME /
+        // VERSION_CODE from it so the version it prints can never drift from the installed build.
+        buildConfig = true
     }
 
     composeOptions {
@@ -85,6 +88,17 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+/**
+ * Room exports its schema here so migrations can be diffed and validated.
+ *
+ * `exportSchema = true` requires this directory — without it KSP fails the build outright — and
+ * without the exported schema a migration mistake is only discoverable on the operator's device,
+ * against their real ledger.
+ */
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

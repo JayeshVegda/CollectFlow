@@ -1,5 +1,6 @@
 package com.jayesh.cashcollect.data.local.dao
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -46,23 +47,6 @@ interface CollectionDao {
         ORDER BY c.created_at DESC
     """)
     fun getAllHistory(): Flow<List<CollectionWithCustomer>>
-
-    @Query("""
-        SELECT c.*, cust.name AS customer_name, cust.alias AS customer_alias
-        FROM collections c
-        INNER JOIN customers cust ON c.customer_id = cust.id
-        WHERE (:status IS NULL OR c.status = :status)
-          AND (:fromTimestamp IS NULL OR c.created_at >= :fromTimestamp)
-          AND (:toTimestamp IS NULL OR c.created_at <= :toTimestamp)
-          AND (:searchQuery IS NULL OR cust.name LIKE '%' || :searchQuery || '%' OR (cust.alias IS NOT NULL AND cust.alias LIKE '%' || :searchQuery || '%'))
-        ORDER BY c.created_at DESC
-    """)
-    fun filterHistory(
-        status: String?,
-        fromTimestamp: Long?,
-        toTimestamp: Long?,
-        searchQuery: String?
-    ): Flow<List<CollectionWithCustomer>>
 
     @Query("SELECT * FROM collections WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): CollectionEntity?
@@ -119,9 +103,38 @@ interface CollectionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(collections: List<CollectionEntity>)
 
+    /**
+     * One day's realized figures, totalled inside SQLite.
+     *
+     * The three home-screen widgets used to pull the entire `collections` table with `getAllSync()`
+     * and total it in Kotlin on every data change — every row of history, as cursors, entities and
+     * objects, to produce three numbers.
+     */
+    @Query("""
+        SELECT
+            COALESCE(SUM(amount_paise), 0) AS total_paise,
+            COALESCE(SUM(commission_paise), 0) AS commission_paise,
+            COUNT(*) AS entry_count
+        FROM collections
+        WHERE status IN ('RECEIPT_CONFIRMED', 'CONFIRMED')
+          AND COALESCE(received_at, created_at) >= :startOfToday
+    """)
+    suspend fun realizedTotalsSince(startOfToday: Long): DayTotals
+
+    /** Cash already in hand that the brother has not been told about yet. */
+    @Query("SELECT COUNT(*) FROM collections WHERE status = 'RECEIPT_CONFIRMED'")
+    suspend fun countAwaitingReport(): Int
+
     @Query("DELETE FROM collections WHERE id = :id")
     suspend fun deleteById(id: Long)
 
     @Query("DELETE FROM collections")
     suspend fun deleteAll()
 }
+
+/** Aggregate row returned by [CollectionDao.realizedTotalsSince]. */
+data class DayTotals(
+    @ColumnInfo(name = "total_paise") val totalPaise: Long,
+    @ColumnInfo(name = "commission_paise") val commissionPaise: Long,
+    @ColumnInfo(name = "entry_count") val entryCount: Int
+)

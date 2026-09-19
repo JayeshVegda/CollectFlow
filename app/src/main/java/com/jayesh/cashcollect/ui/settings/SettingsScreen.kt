@@ -1,5 +1,8 @@
 package com.jayesh.cashcollect.ui.settings
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -28,14 +30,9 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,7 +55,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jayesh.cashcollect.domain.model.AppSettings
 import com.jayesh.cashcollect.domain.template.MessageTemplateEngine
+import com.jayesh.cashcollect.ui.common.AppOutlinedButton
+import com.jayesh.cashcollect.ui.common.AppPrimaryButton
+import com.jayesh.cashcollect.ui.common.AppScreenTitle
+import com.jayesh.cashcollect.ui.common.AppSectionLabel
+import com.jayesh.cashcollect.ui.common.AppTextField
 import com.jayesh.cashcollect.ui.common.GlassSurface
+import com.jayesh.cashcollect.ui.theme.AppType
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
@@ -68,6 +71,10 @@ import com.jayesh.cashcollect.ui.theme.NothingGray
 import com.jayesh.cashcollect.ui.theme.NothingMuted
 import com.jayesh.cashcollect.ui.theme.NothingRed
 import com.jayesh.cashcollect.ui.theme.NothingWhite
+import com.jayesh.cashcollect.ui.theme.Space
+import com.jayesh.cashcollect.ui.theme.TextDisplay
+import com.jayesh.cashcollect.ui.theme.TextSecondary
+import com.jayesh.cashcollect.ui.theme.TextTertiary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -76,7 +83,7 @@ import java.util.Locale
 fun SettingsRoute(
     viewModel: SettingsViewModel,
     onBackupNow: () -> Unit,
-    onRestoreBackupClick: () -> Unit,
+    onRestoreBackup: (Uri) -> Unit,
     onBackClick: () -> Unit
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -86,8 +93,9 @@ fun SettingsRoute(
         onSaveNumber = viewModel::saveBrotherNumber,
         onSaveTemplate = viewModel::saveMessageTemplate,
         onSaveRate = viewModel::saveCommissionRate,
+        onSaveNotificationDelay = viewModel::saveNotificationDelay,
         onBackupNow = onBackupNow,
-        onRestoreBackupClick = onRestoreBackupClick,
+        onRestoreBackup = onRestoreBackup,
         onBackClick = onBackClick
     )
 }
@@ -99,8 +107,9 @@ fun SettingsScreen(
     onSaveNumber: (String) -> Unit,
     onSaveTemplate: (String) -> Unit,
     onSaveRate: (Int) -> Unit,
+    onSaveNotificationDelay: (Int) -> Unit,
     onBackupNow: () -> Unit,
-    onRestoreBackupClick: () -> Unit,
+    onRestoreBackup: (Uri) -> Unit,
     onBackClick: () -> Unit
 ) {
     var brotherNumber by remember(settings.brotherWhatsAppNumber) {
@@ -112,7 +121,17 @@ fun SettingsScreen(
     var commissionRateText by remember(settings.commissionRatePerThousand) {
         mutableStateOf(settings.commissionRatePerThousand.toString())
     }
+    var notificationDelayText by remember(settings.notificationDelayMs) {
+        mutableStateOf(settings.notificationDelayMs.toString())
+    }
     var showSavedMessage by remember { mutableStateOf(false) }
+    var showRestoreConfirm by remember { mutableStateOf(false) }
+
+    // The system file picker, not a hardcoded path: a `content://` grant is the only way to read a
+    // backup the operator saved to Drive, Downloads or a chat, and it needs no runtime permission.
+    val restorePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) onRestoreBackup(uri) }
 
     val previewMessage = remember(messageTemplate) {
         MessageTemplateEngine.preview(messageTemplate)
@@ -125,15 +144,7 @@ fun SettingsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "SETTINGS",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        color = NothingWhite
-                    )
-                },
+                title = { AppScreenTitle("Settings") },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = NothingBlack)
             )
         }
@@ -150,34 +161,22 @@ fun SettingsScreen(
 
             GlassSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = brotherNumber,
                         onValueChange = { brotherNumber = it },
-                        label = { Text("Recipient number", color = NothingGray, fontFamily = FontFamily.Monospace, fontSize = 12.sp) },
-                        placeholder = { Text("+919510233829", color = NothingMuted) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NothingWhite,
-                            unfocusedBorderColor = NothingBorderVisible,
-                            focusedTextColor = NothingWhite,
-                            unfocusedTextColor = NothingWhite
-                        )
+                        label = "Recipient number",
+                        placeholder = "+919510233829",
+                        keyboardType = KeyboardType.Phone
                     )
-                    Button(
+                    AppPrimaryButton(
+                        label = "Save",
+                        icon = Icons.Default.Save,
+                        modifier = Modifier.align(Alignment.End),
                         onClick = {
                             onSaveNumber(brotherNumber)
                             showSavedMessage = true
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = NothingWhite, contentColor = Color.Black),
-                        modifier = Modifier.align(Alignment.End),
-                        shape = RoundedCornerShape(999.dp)
-                    ) {
-                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("SAVE", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
-                    }
+                        }
+                    )
                 }
             }
 
@@ -209,17 +208,12 @@ fun SettingsScreen(
                         }
                     }
 
-                    OutlinedTextField(
+                    AppTextField(
                         value = messageTemplate,
                         onValueChange = { messageTemplate = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 3,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NothingWhite,
-                            unfocusedBorderColor = NothingBorderVisible,
-                            focusedTextColor = NothingWhite,
-                            unfocusedTextColor = NothingWhite
-                        )
+                        label = "Message template",
+                        singleLine = false,
+                        minLines = 3
                     )
 
                     Text(
@@ -248,19 +242,15 @@ fun SettingsScreen(
                         )
                     }
 
-                    Button(
+                    AppPrimaryButton(
+                        label = "Save template",
+                        icon = Icons.Default.Save,
+                        modifier = Modifier.align(Alignment.End),
                         onClick = {
                             onSaveTemplate(messageTemplate)
                             showSavedMessage = true
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = NothingWhite, contentColor = Color.Black),
-                        modifier = Modifier.align(Alignment.End),
-                        shape = RoundedCornerShape(999.dp)
-                    ) {
-                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("SAVE TEMPLATE", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
-                    }
+                        }
+                    )
                 }
             }
 
@@ -268,33 +258,84 @@ fun SettingsScreen(
 
             GlassSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = commissionRateText,
                         onValueChange = { commissionRateText = it },
-                        label = { Text("Rate per 1000", color = NothingGray, fontFamily = FontFamily.Monospace, fontSize = 12.sp) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NothingWhite,
-                            unfocusedBorderColor = NothingBorderVisible,
-                            focusedTextColor = NothingWhite,
-                            unfocusedTextColor = NothingWhite
-                        )
+                        label = "Rate per 1000",
+                        keyboardType = KeyboardType.Number
                     )
-                    Button(
+                    AppPrimaryButton(
+                        label = "Save rate",
+                        icon = Icons.Default.Save,
+                        modifier = Modifier.align(Alignment.End),
                         onClick = {
                             onSaveRate(commissionRateText.toIntOrNull() ?: 3)
                             showSavedMessage = true
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = NothingWhite, contentColor = Color.Black),
-                        modifier = Modifier.align(Alignment.End),
-                        shape = RoundedCornerShape(999.dp)
+                        }
+                    )
+                }
+            }
+
+            SettingsHeader("NOTIFICATION DELAY", "When the \"Reported?\" prompt appears")
+
+            GlassSurface(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Receiving cash opens WhatsApp immediately, so the prompt waits until the message has gone out. 3000–5000 ms suits a normal send. 0 posts it at once.",
+                        fontSize = 11.sp,
+                        color = NothingMuted,
+                        lineHeight = 16.sp
+                    )
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("SAVE RATE", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
+                        for (preset in listOf(0, 3000, 5000, 10000)) {
+                            val selected = notificationDelayText.toIntOrNull() == preset
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (selected) Color(0x33FFFFFF) else Color(0x14FFFFFF))
+                                    .border(
+                                        1.dp,
+                                        if (selected) NothingWhite else NothingGlassBorder,
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .clickable { notificationDelayText = preset.toString() }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (preset == 0) "INSTANT" else "${preset / 1000}s",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = NothingWhite
+                                )
+                            }
+                        }
                     }
+
+                    AppTextField(
+                        value = notificationDelayText,
+                        // Digits only: the field is milliseconds, so a stray sign or letter would
+                        // otherwise reach the clamp as 0 and look like the save silently failed.
+                        onValueChange = { input -> notificationDelayText = input.filter { it.isDigit() }.take(5) },
+                        label = "Custom delay (ms)",
+                        keyboardType = KeyboardType.Number
+                    )
+
+                    AppPrimaryButton(
+                        label = "Save delay",
+                        icon = Icons.Default.Save,
+                        modifier = Modifier.align(Alignment.End),
+                        onClick = {
+                            onSaveNotificationDelay(
+                                notificationDelayText.toIntOrNull() ?: AppSettings.DEFAULT_NOTIFICATION_DELAY_MS
+                            )
+                            showSavedMessage = true
+                        }
+                    )
                 }
             }
 
@@ -322,26 +363,20 @@ fun SettingsScreen(
                         color = NothingGray
                     )
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        AppPrimaryButton(
+                            label = "Back up now",
                             onClick = onBackupNow,
-                            colors = ButtonDefaults.buttonColors(containerColor = NothingWhite),
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(999.dp)
-                        ) {
-                            Text("BACK UP NOW", fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                        }
+                            modifier = Modifier.weight(1f)
+                        )
 
-                        OutlinedButton(
-                            onClick = onRestoreBackupClick,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(999.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, NothingBorderVisible)
-                        ) {
-                            Icon(Icons.Default.Restore, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("RESTORE", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
-                        }
+                        AppOutlinedButton(
+                            label = "Restore",
+                            icon = Icons.Default.Restore,
+                            accent = TextDisplay,
+                            onClick = { showRestoreConfirm = true },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
@@ -351,7 +386,9 @@ fun SettingsScreen(
                     Icon(Icons.Default.Warning, contentDescription = null, tint = NothingAmber, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "All data is stored offline on this device. Take a backup before uninstalling or switching phones.",
+                        text = "All data is stored offline on this phone only. The encrypted backup can be " +
+                            "restored on this phone; it is locked to this phone's hardware key, so it " +
+                            "cannot currently be moved to a different phone.",
                         fontSize = 12.sp,
                         color = NothingGray,
                         lineHeight = 18.sp
@@ -361,6 +398,38 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(72.dp))
         }
+    }
+
+    // Restore replaces the whole ledger, so it asks first and spells out exactly what happens.
+    if (showRestoreConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRestoreConfirm = false },
+            containerColor = Color(0xFF1A1A1A),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.border(1.dp, NothingRed, RoundedCornerShape(16.dp)),
+            title = { Text("RESTORE FROM BACKUP", fontFamily = FontFamily.Monospace, color = NothingWhite) },
+            text = {
+                Text(
+                    "Every entry currently in the app is replaced by the contents of the backup file. " +
+                        "Nothing is merged and the current entries are not kept. Pick the .enc file you " +
+                        "exported with BACK UP NOW.",
+                    color = NothingGray
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRestoreConfirm = false
+                    restorePicker.launch(arrayOf("*/*"))
+                }) {
+                    Text("CHOOSE FILE", color = NothingRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestoreConfirm = false }) {
+                    Text("CANCEL", color = NothingGray)
+                }
+            }
+        )
     }
 
     if (showSavedMessage) {
@@ -382,15 +451,10 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsHeader(label: String, hint: String) {
-    Column(modifier = Modifier.padding(top = 8.dp)) {
-        Text(
-            text = label,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            fontSize = 12.sp,
-            letterSpacing = 1.sp,
-            color = NothingWhite
-        )
-        Text(text = hint, fontSize = 11.sp, color = NothingMuted)
+    Column(modifier = Modifier.padding(top = Space.sm)) {
+        AppSectionLabel(text = label, color = TextDisplay)
+        // TextTertiary rather than NothingMuted: this hint is content the operator has to read, and
+        // #666666 measures roughly 3.7:1 against the canvas — below the 4.5:1 AA floor.
+        Text(text = hint, style = AppType.caption, color = TextTertiary)
     }
 }

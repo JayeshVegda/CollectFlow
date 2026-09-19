@@ -11,11 +11,13 @@ import com.jayesh.cashcollect.data.backup.CsvExporter
 import com.jayesh.cashcollect.data.repository.CollectionRepository
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.state.CollectionStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -60,7 +62,11 @@ class HistoryViewModel(
             SortOption.OLDEST -> filtered.sortedBy { it.createdAt }
             SortOption.HIGHEST_AMOUNT -> filtered.sortedByDescending { it.amountPaise }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
+        // Search filters and sorts the whole history, which used to happen on the main thread on
+        // every keystroke. `flowOn` moves the filtering upstream, off the thread handling typing.
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun toggleSort() {
         _sortOption.value = when (_sortOption.value) {

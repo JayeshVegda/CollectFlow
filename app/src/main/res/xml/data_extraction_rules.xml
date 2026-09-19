@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (android:dataExtractionRules).
+
+  Defensive: allowBackup is already off, so nothing here runs today. It exists so that turning
+  allowBackup back on cannot leak the ledger through cloud backup or device-to-device transfer.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- The cash ledger: party names, amounts, timestamps. -->
+        <exclude domain="database" path="." />
+        <!-- Encrypted export backups, pre-update copies, preserved databases, crash reports. -->
+        <exclude domain="file" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="root" path="." />
+    </cloud-backup>
+
+    <device-transfer>
+        <!--
+            Transferred only by the operator's choice of backup file, not by a cable between phones:
+            the encrypted export in Settings is the supported way to move this ledger.
+        -->
+        <exclude domain="database" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="root" path="." />
+    </device-transfer>
+</data-extraction-rules>

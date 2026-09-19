@@ -27,3 +27,8 @@ keystore/
 *.jks
 *.keystore
 local.properties
+
+# Working notes / AI session logs: not source, and a place for accidental leakage of
+# paths, tokens or device details. Kept locally, never published.
+CHAT_HISTORY.md
+antigravity_session_backup.tar.gz

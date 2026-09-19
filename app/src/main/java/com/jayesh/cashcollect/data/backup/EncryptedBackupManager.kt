@@ -1,6 +1,7 @@
 package com.jayesh.cashcollect.data.backup
 
 import android.content.Context
+import android.net.Uri
 import androidx.room.withTransaction
 import androidx.security.crypto.EncryptedFile
 import androidx.security.crypto.MasterKey
@@ -8,6 +9,8 @@ import com.jayesh.cashcollect.data.local.AppDatabase
 import com.jayesh.cashcollect.data.local.entity.CollectionEntity
 import com.jayesh.cashcollect.data.local.entity.CustomerEntity
 import com.jayesh.cashcollect.data.local.entity.SettingsEntity
+import com.jayesh.cashcollect.domain.model.AppSettings
+import com.jayesh.cashcollect.domain.money.CommissionCalculator
 import com.jayesh.cashcollect.domain.template.MessageTemplateEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -81,6 +84,9 @@ class EncryptedBackupManager(
                     put("commission_rate_per_thousand", settings.commissionRatePerThousand)
                     put("last_backup_at", settings.lastBackupAt ?: JSONObject.NULL)
                     put("message_template", settings.messageTemplate)
+                    // Every setting is exported, not just the ones that were here first. Omitting a
+                    // field makes restore silently reset it to its default.
+                    put("notification_delay_ms", settings.notificationDelayMs)
                 })
             }
         }
@@ -106,6 +112,33 @@ class EncryptedBackupManager(
 
         database.settingsDao().updateLastBackupTimestamp(System.currentTimeMillis())
         backupFile
+    }
+
+    /**
+     * Restores a backup the operator picked through the system file picker.
+     *
+     * A `content://` URI is only readable while the grant lasts and `EncryptedFile` needs a real
+     * path, so the stream is staged into the app's private cache first. The staged copy is removed
+     * in `finally` — it is ciphertext, but it has no reason to linger in a shared cache directory.
+     */
+    suspend fun restoreFromUri(uri: Uri): Result<Int> = withContext(Dispatchers.IO) {
+        val staged = File(context.cacheDir, "restore_pending.enc")
+        try {
+            val opened = context.contentResolver.openInputStream(uri)
+            if (opened == null) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("Could not read the selected file.")
+                )
+            }
+            opened.use { input ->
+                staged.outputStream().use { output -> input.copyTo(output) }
+            }
+            restoreEncryptedBackup(staged)
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            runCatching { staged.delete() }
+        }
     }
 
     suspend fun restoreEncryptedBackup(file: File): Result<Int> = withContext(Dispatchers.IO) {
@@ -182,13 +215,33 @@ class EncryptedBackupManager(
 
                 if (rootJson.has("settings")) {
                     val settingsObj = rootJson.getJSONObject("settings")
+                    // Every field comes back out of the file, including the receipt-nudge delay and
+                    // the last-backup stamp. The previous version rebuilt the row from hardcoded
+                    // defaults, so restoring silently reset a configured delay back to 4s — a
+                    // backup that does not round-trip is not a backup.
                     database.settingsDao().insertOrUpdate(
                         SettingsEntity(
                             id = 1L,
                             brotherWhatsAppNumber = settingsObj.optString("brother_whatsapp_number", ""),
-                            commissionRatePerThousand = settingsObj.optInt("commission_rate_per_thousand", 3),
-                            lastBackupAt = System.currentTimeMillis(),
-                            messageTemplate = settingsObj.optString("message_template", MessageTemplateEngine.DEFAULT_TEMPLATE)
+                            commissionRatePerThousand = settingsObj.optInt(
+                                "commission_rate_per_thousand",
+                                CommissionCalculator.DEFAULT_RATE_PER_THOUSAND
+                            ),
+                            lastBackupAt = if (settingsObj.isNull("last_backup_at")) {
+                                System.currentTimeMillis()
+                            } else {
+                                settingsObj.optLong("last_backup_at", System.currentTimeMillis())
+                            },
+                            messageTemplate = settingsObj.optString(
+                                "message_template",
+                                MessageTemplateEngine.DEFAULT_TEMPLATE
+                            ),
+                            // Absent in backups written before this field existed, which is why it
+                            // is read with the app's own default rather than assuming it is there.
+                            notificationDelayMs = settingsObj.optInt(
+                                "notification_delay_ms",
+                                AppSettings.DEFAULT_NOTIFICATION_DELAY_MS
+                            )
                         )
                     )
                 }
@@ -196,7 +249,38 @@ class EncryptedBackupManager(
 
             Result.success(parsedCollections.size)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(
+                if (isDecryptionFailure(e)) {
+                    // Worth distinguishing: "wrong file" and "right file, wrong device" need
+                    // different actions from the operator, and the second one is not obvious.
+                    IllegalStateException(
+                        "This backup cannot be opened on this device. It was encrypted with a key " +
+                            "that lives in the Android Keystore of the phone that created it, and " +
+                            "that key never leaves that phone.",
+                        e
+                    )
+                } else {
+                    e
+                }
+            )
         }
+    }
+
+    /**
+     * True when the failure is a key/authentication failure rather than a missing or malformed file.
+     *
+     * EncryptedFile surfaces these at different depths — Tink throws `GeneralSecurityException`, and
+     * the streaming reader wraps some of them in `IOException` — so the cause chain is walked.
+     */
+    private fun isDecryptionFailure(error: Throwable): Boolean {
+        var current: Throwable? = error
+        var depth = 0
+        while (current != null && depth < 5) {
+            if (current is javax.crypto.AEADBadTagException) return true
+            if (current is java.security.GeneralSecurityException) return true
+            current = current.cause
+            depth++
+        }
+        return false
     }
 }

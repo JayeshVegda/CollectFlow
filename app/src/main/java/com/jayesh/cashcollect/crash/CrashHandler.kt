@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import com.jayesh.cashcollect.BuildConfig
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -79,7 +80,7 @@ object CrashHandler {
             appendLine("Time: $timeStr")
             appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})")
             appendLine("Android OS: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-            appendLine("App Version: 2.0.0")
+            appendLine("App Version: ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})")
             appendLine("Thread: ${thread.name} (ID: ${thread.id})")
             appendLine("Exception: ${throwable.javaClass.name}")
             appendLine("Message: ${throwable.message}")

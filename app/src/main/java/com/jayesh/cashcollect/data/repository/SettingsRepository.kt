@@ -38,11 +38,26 @@ class SettingsRepository(private val settingsDao: SettingsDao) {
         settingsDao.updateMessageTemplate(template.trim())
     }
 
+    /**
+     * Sets how long the receipt nudge waits before it is posted. `0` means post immediately.
+     *
+     * Bounded rather than free-form: a delay is a promise to the operator that the prompt is
+     * coming, so a value so large it reads as "never" is rejected instead of silently accepted.
+     */
+    suspend fun updateNotificationDelay(delayMs: Int) {
+        require(delayMs in 0..AppSettings.MAX_NOTIFICATION_DELAY_MS) {
+            "Notification delay must be between 0 and ${AppSettings.MAX_NOTIFICATION_DELAY_MS} ms: $delayMs"
+        }
+        settingsDao.ensureRow(SettingsEntity())
+        settingsDao.updateNotificationDelay(delayMs)
+    }
+
     private fun SettingsEntity.toDomain() = AppSettings(
         id = id,
         brotherWhatsAppNumber = brotherWhatsAppNumber,
         commissionRatePerThousand = commissionRatePerThousand,
         lastBackupAt = lastBackupAt,
-        messageTemplate = messageTemplate
+        messageTemplate = messageTemplate,
+        notificationDelayMs = notificationDelayMs
     )
 }
