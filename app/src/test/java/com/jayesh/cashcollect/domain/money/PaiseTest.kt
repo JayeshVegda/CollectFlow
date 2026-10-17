@@ -29,4 +29,23 @@ class PaiseTest {
     fun `negative paise creation throws exception`() {
         Paise(-1L)
     }
+
+    @Test
+    fun `toCompactRupees and toShortRupeeString format compact Indian currency`() {
+        val tenK = Paise.fromRupees(10_000L)
+        assertEquals("₹10,000", tenK.toCompactRupees())
+        assertEquals("₹10,000", tenK.toShortRupeeString())
+
+        val fourLakh = Paise.fromRupees(400_000L)
+        assertEquals("₹4L", fourLakh.toCompactRupees())
+        assertEquals("₹4L", fourLakh.toShortRupeeString())
+
+        val oneAndHalfLakh = Paise.fromRupees(150_000L)
+        assertEquals("₹1.5L", oneAndHalfLakh.toCompactRupees())
+        assertEquals("₹1.5L", oneAndHalfLakh.toShortRupeeString())
+
+        val twoCrore = Paise.fromRupees(20_000_000L)
+        assertEquals("₹2Cr", twoCrore.toCompactRupees())
+        assertEquals("₹2Cr", twoCrore.toShortRupeeString())
+    }
 }

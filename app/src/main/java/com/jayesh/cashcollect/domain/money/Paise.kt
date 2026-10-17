@@ -63,6 +63,12 @@ value class Paise(val value: Long) : Comparable<Paise> {
         }
     }
 
+    /**
+     * Compact Indian currency string representation (e.g. ₹50,000, ₹1.5L, ₹1Cr).
+     * Alias for [toCompactRupees] used in charts, widgets, and compact badges.
+     */
+    fun toShortRupeeString(includeSymbol: Boolean = true): String = toCompactRupees(includeSymbol)
+
     companion object {
         private const val LAKH = 100_000L
         private const val CRORE = 10_000_000L
