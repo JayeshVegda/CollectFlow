@@ -5,9 +5,9 @@
     android:layout_height="match_parent"
     android:background="@drawable/bg_nothing_widget"
     android:orientation="vertical"
-    android:gravity="center_vertical"
-    android:padding="14dp">
+    android:padding="12dp">
 
+    <!-- Top Row: Brand & Status -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -17,9 +17,9 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="TODAY"
-            android:textColor="#999999"
-            android:textSize="10sp"
+            android:text="COLLECTFLOW"
+            android:textColor="#D71921"
+            android:textSize="9sp"
             android:textStyle="bold"
             android:letterSpacing="0.08" />
 
@@ -28,30 +28,65 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:text="✓ ALL CONFIRMED"
+            android:gravity="end"
+            android:text="✓ ALL CLEAR"
             android:textColor="#4A9E5C"
-            android:textSize="10sp"
-            android:textStyle="bold" />
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/widget_mini_amount"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+    <!-- Center Section: Collected & Pending -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
         android:layout_marginTop="2dp"
-        android:text="₹0"
-        android:textColor="#FFFFFF"
-        android:textSize="24sp"
-        android:textStyle="bold" />
+        android:layout_marginBottom="2dp">
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="COLLECTED TODAY"
+            android:textColor="#8E8E93"
+            android:textSize="8.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
+
+        <TextView
+            android:id="@+id/widget_mini_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="₹0"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/widget_mini_pending"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:text="PENDING: ₹0"
+            android:textColor="#D4A843"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <!-- Bottom Button: + Quick Capture -->
     <LinearLayout
         android:id="@+id/widget_mini_btn_quick"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
         android:background="@drawable/bg_nothing_btn_pill_white"
-        android:paddingVertical="8dp"
+        android:paddingVertical="6dp"
         android:gravity="center">
 
         <TextView
@@ -59,9 +94,9 @@
             android:layout_height="wrap_content"
             android:text="+ QUICK CAPTURE"
             android:textColor="#000000"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:letterSpacing="0.06" />
+            android:letterSpacing="0.04" />
     </LinearLayout>
 
 </LinearLayout>

@@ -131,20 +131,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "CollectFlow v2.1.0 Beta (latest)"
+          name: "CollectFlow v2.1.1 Beta (latest)"
           make_latest: "true"
           body: |
-            ## CollectFlow v2.1.0 (Beta)
+            ## CollectFlow v2.1.1 (Beta)
             - **CollectFlow-release.apk**: optimized release build.
             - **CollectFlow-debug.apk**: debug build.
 
-            ### What's New in v2.1.0:
-            - **Apple Bottom Navigation**: Sleek 52dp bar with micro-interactions, subtle active capsule indicators, and tactile haptic feedback.
+            ### What's New in v2.1.1:
+            - **Comfortable Bottom Navigation**: Height increased to 64dp with 24dp icons, 11.5sp clear typography, rich `#222228` active capsule indicators, and iOS neutral inactive color.
+            - **2×2 Mini Widget Visibility**: Adjusted minWidth/minHeight to 110dp, added explicit launcher receiver labels and previewLayout, enhanced dark wallpaper contrast (`#141418` surface with `#2E2E38` border), and display of both Collected Today and Pending amounts.
             - **Redesigned Insights Screen**: Apple Wallet hero card, iOS segmented time ranges (Today, 7D, Month, All Time), and Screen Time style counterparty breakdown.
-            - **Quick Capture 2.0**: Most Frequent combination presets, quick amount chips up to 10L, and cleaner dismissable keyboard behavior.
-            - **Dynamic Launcher Widget**: Redesigned 4x2, 3x2, and 2x2 remote views displaying live collected totals, pending balances, and instant action shortcuts.
-            - **Side-by-Side Coexistence**: Application ID `com.jayesh.cashcollect.beta` with emerald green badge allows zero-risk testing alongside existing production CollectFlow.
-            - **Simple CSV Backup & Migration**: Plain-text CSV export and import for seamless migration of older ledger records.
+            - **Quick Capture 2.0**: Most Frequent combination presets, quick amount chips up to 10L, and non-intrusive keyboard behavior.
+            - **Side-by-Side Coexistence**: Package `com.jayesh.cashcollect.beta` with emerald green badge for zero-risk testing alongside existing production CollectFlow.
+            - **Simple CSV Backup & Migration**: Plain-text CSV export and import in Settings.
           files: |
             CollectFlow-release.apk
             CollectFlow-debug.apk

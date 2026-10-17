@@ -548,6 +548,11 @@ class MainActivity : ComponentActivity() {
         }
     }
     }
+
+    override fun onResume() {
+        super.onResume()
+        CashCollectWidgetProvider.notifyDataChanged(this)
+    }
 }
 
 
@@ -560,22 +565,22 @@ private fun AppleBottomNavigationBar(
     val haptics = LocalHapticFeedback.current
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color(0xF5101012),
+        color = Color(0xF8121215),
         tonalElevation = 0.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(0.5.dp)
-                    .background(Color(0xFF222226))
+                    .height(1.dp)
+                    .background(Color(0xFF26262C))
             )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .height(52.dp)
-                    .padding(horizontal = 8.dp),
+                    .height(64.dp)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -635,13 +640,13 @@ private fun RowScope.AppleTabItem(
         ),
         label = "tab_scale"
     )
-    val contentColor = if (selected) NothingWhite else Color(0xFF71717A)
+    val contentColor = if (selected) NothingWhite else Color(0xFF8E8E93)
 
     Box(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -659,24 +664,24 @@ private fun RowScope.AppleTabItem(
         ) {
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(if (selected) Color(0xFF1E1E24) else Color.Transparent)
-                    .padding(horizontal = 14.dp, vertical = 3.dp),
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (selected) Color(0xFF222228) else Color.Transparent)
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
                     tint = contentColor,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = label,
                 style = AppType.labelSm,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                fontSize = 10.5.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                fontSize = 11.5.sp,
                 color = contentColor,
                 maxLines = 1
             )

@@ -25,12 +25,12 @@ CollectFlow is a single-user, offline-first native Android app designed for high
   on a different phone. CSV export carries both exact paise integers and plain decimal rupees.
 - **Periodic Reminders:** WorkManager periodic reminder for unconfirmed collections awaiting WhatsApp confirmation.
 
-## What's New in v2.1.0 (Beta)
+## What's New in v2.1.1 (Beta)
+- **Comfortable Bottom Navigation**: Increased height to 64dp with 24dp crisp icons, 11.5sp clear typography, rich `#222228` active capsule indicators, and iOS neutral inactive color.
+- **2×2 Mini Widget Visibility**: Calibrated widget dimensions (`110dp × 110dp`) for reliable placement across all Android launchers, added explicit launcher titles, enhanced contrast with `#141418` surface and `#2E2E38` border, and added pending balance display alongside collected today.
 - **Side-by-Side Coexistence (`.beta` package)**: Installs alongside your existing CollectFlow app with a distinct emerald green icon badge, allowing zero-risk testing without uninstalling or endangering your current ledger.
-- **Apple HIG Bottom Navigation**: Slim 52dp tab bar with subtle active capsules, fluid spring micro-interactions, 0.5dp borders, and tactile haptic feedback.
 - **Redesigned Insights Screen**: Ground-up Apple Wallet style hero card, iOS segmented time ranges (Today, 7D, Month, All Time), and Screen Time style counterparty breakdown.
 - **Quick Capture 2.0**: Most Frequent combination presets (`Sambhu 3l`, `Sambhu 1.5l`, etc.) computed directly from history, quick amount chips up to 10L, and clean non-intrusive keyboard behavior.
-- **Dynamic Launcher Widget**: Redesigned 4x2, 3x2, and 2x2 RemoteViews displaying live collected totals, pending balances, and instant action shortcuts.
 - **Simple CSV Backup & Restore**: Plain-text CSV export and import in Settings for seamless, cross-device or cross-version data migration.
 - **Refined Slim Typography**: Clean, modern typography and compact cards replacing heavy monospace styling.
 

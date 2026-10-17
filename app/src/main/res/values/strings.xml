@@ -3,4 +3,10 @@
     <string name="collections">Collections</string>
     <string name="history">History</string>
     <string name="settings">Settings</string>
+    <string name="widget_mini_label">CollectFlow 2×2 Mini</string>
+    <string name="widget_mini_description">Compact 2×2 widget showing collected cash, pending balance, and quick capture.</string>
+    <string name="widget_wide_label">CollectFlow 4×2 Live Tracker</string>
+    <string name="widget_wide_description">4×2 wide dashboard showing pending collections, today total, and action shortcuts.</string>
+    <string name="widget_compact_label">CollectFlow 3×2 Quick Glance</string>
+    <string name="widget_compact_description">3×2 widget showing today cash and quick capture.</string>
 </resources>

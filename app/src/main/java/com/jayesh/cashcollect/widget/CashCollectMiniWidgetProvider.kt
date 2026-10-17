@@ -36,55 +36,72 @@ class CashCollectMiniWidgetProvider : AppWidgetProvider() {
             appWidgetIds: IntArray
         ) {
             CoroutineScope(Dispatchers.IO).launch {
-                // Collected cash only, over the one shared definition of "today".
-                val snapshot = loadWidgetSnapshot(context) ?: return@launch
-                val amountFormatted = Paise(snapshot.todayTotalPaise).toFormattedRupees()
+                runCatching {
+                    val snapshot = loadWidgetSnapshot(context)
 
-                val statusText = if (snapshot.pendingTotalPaise > 0L) {
-                    "${Paise(snapshot.pendingTotalPaise).toShortRupeeString()} PENDING"
-                } else if (snapshot.awaitingReportCount > 0) {
-                    "${snapshot.awaitingReportCount} UNSENT"
-                } else {
-                    "✓ ALL CLEAR"
-                }
-                val statusColor = if (snapshot.pendingTotalPaise > 0L || snapshot.awaitingReportCount > 0) {
-                    0xFFD4A843.toInt()
-                } else {
-                    0xFF4A9E5C.toInt()
-                }
-
-                for (appWidgetId in appWidgetIds) {
-                    val views = RemoteViews(context.packageName, R.layout.widget_cash_collect_mini).apply {
-                        setTextViewText(R.id.widget_mini_amount, amountFormatted)
-                        setTextViewText(R.id.widget_mini_status, statusText)
-                        setTextColor(R.id.widget_mini_status, statusColor)
-
-                        val openAppIntent = Intent(context, MainActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        }
-                        val openAppPendingIntent = PendingIntent.getActivity(
-                            context,
-                            40,
-                            openAppIntent,
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                        )
-                        setOnClickPendingIntent(R.id.widget_mini_container, openAppPendingIntent)
-
-                        val openQuickIntent = Intent(context, MainActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                            putExtra("EXTRA_OPEN_QUICK_CAPTURE", true)
-                        }
-                        val openQuickPendingIntent = PendingIntent.getActivity(
-                            context,
-                            41,
-                            openQuickIntent,
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                        )
-                        setOnClickPendingIntent(R.id.widget_mini_btn_quick, openQuickPendingIntent)
+                    val amountFormatted = if (snapshot != null) {
+                        Paise(snapshot.todayTotalPaise).toFormattedRupees()
+                    } else {
+                        "₹0"
                     }
 
-                    appWidgetManager.updateAppWidget(appWidgetId, views)
-                }
+                    val pendingFormatted = if (snapshot != null && snapshot.pendingTotalPaise > 0L) {
+                        "PENDING: " + Paise(snapshot.pendingTotalPaise).toShortRupeeString()
+                    } else {
+                        "PENDING: ₹0"
+                    }
+                    val pendingColor = if (snapshot != null && snapshot.pendingTotalPaise > 0L) {
+                        0xFFD4A843.toInt() // Amber
+                    } else {
+                        0xFF8E8E93.toInt() // Gray
+                    }
+
+                    val statusText = if (snapshot != null && snapshot.awaitingReportCount > 0) {
+                        "⚠️ ${snapshot.awaitingReportCount} UNSENT"
+                    } else {
+                        "✓ ALL CLEAR"
+                    }
+                    val statusColor = if (snapshot != null && snapshot.awaitingReportCount > 0) {
+                        0xFFD4A843.toInt() // Amber
+                    } else {
+                        0xFF4A9E5C.toInt() // Green
+                    }
+
+                    for (appWidgetId in appWidgetIds) {
+                        val views = RemoteViews(context.packageName, R.layout.widget_cash_collect_mini).apply {
+                            setTextViewText(R.id.widget_mini_amount, amountFormatted)
+                            setTextViewText(R.id.widget_mini_pending, pendingFormatted)
+                            setTextColor(R.id.widget_mini_pending, pendingColor)
+                            setTextViewText(R.id.widget_mini_status, statusText)
+                            setTextColor(R.id.widget_mini_status, statusColor)
+
+                            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            }
+                            val openAppPendingIntent = PendingIntent.getActivity(
+                                context,
+                                40,
+                                openAppIntent,
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                            )
+                            setOnClickPendingIntent(R.id.widget_mini_container, openAppPendingIntent)
+
+                            val openQuickIntent = Intent(context, MainActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                putExtra("EXTRA_OPEN_QUICK_CAPTURE", true)
+                            }
+                            val openQuickPendingIntent = PendingIntent.getActivity(
+                                context,
+                                41,
+                                openQuickIntent,
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                            )
+                            setOnClickPendingIntent(R.id.widget_mini_btn_quick, openQuickPendingIntent)
+                        }
+
+                        appWidgetManager.updateAppWidget(appWidgetId, views)
+                    }
+                }.onFailure { it.printStackTrace() }
             }
         }
     }

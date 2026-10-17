@@ -2,10 +2,15 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="140dp"
     android:minHeight="70dp"
+    android:minResizeWidth="120dp"
+    android:minResizeHeight="60dp"
     android:targetCellWidth="3"
     android:targetCellHeight="1"
+    android:maxResizeWidth="400dp"
+    android:maxResizeHeight="200dp"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_cash_collect"
+    android:previewLayout="@layout/widget_cash_collect"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
-    android:description="@string/app_name" />
+    android:description="@string/widget_compact_description" />

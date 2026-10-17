@@ -64,6 +64,7 @@
 
         <receiver
             android:name=".widget.CashCollectWidgetProvider"
+            android:label="@string/widget_compact_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -75,6 +76,7 @@
 
         <receiver
             android:name=".widget.CashCollectTrackerWidgetProvider"
+            android:label="@string/widget_wide_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -86,6 +88,7 @@
 
         <receiver
             android:name=".widget.CashCollectMiniWidgetProvider"
+            android:label="@string/widget_mini_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
