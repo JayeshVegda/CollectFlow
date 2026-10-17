@@ -38,6 +38,7 @@ class CashCollectMiniWidgetProvider : AppWidgetProvider() {
             CoroutineScope(Dispatchers.IO).launch {
                 // Collected cash only, over the one shared definition of "today".
                 val snapshot = loadWidgetSnapshot(context) ?: return@launch
+                val amountFormatted = Paise(snapshot.todayTotalPaise).toFormattedRupees()
 
                 val statusText = if (snapshot.pendingTotalPaise > 0L) {
                     "${Paise(snapshot.pendingTotalPaise).toShortRupeeString()} PENDING"

@@ -61,7 +61,7 @@ class SettingsViewModel(
             try {
                 val allItems = collectionRepo.getAllHistory().first()
                 val csvFile = csvExporter.exportHistoryToCsv(allItems)
-                settingsRepo.updateLastBackupTime(System.currentTimeMillis())
+                settingsRepo.updateLastBackupTimestamp(System.currentTimeMillis())
                 val uri = FileProvider.getUriForFile(
                     context,
                     "${context.packageName}.fileprovider",
@@ -88,7 +88,7 @@ class SettingsViewModel(
                     return@launch
                 }
                 val result = csvImporter.importFromStream(stream, replaceExisting = true)
-                settingsRepo.updateLastBackupTime(System.currentTimeMillis())
+                settingsRepo.updateLastBackupTimestamp(System.currentTimeMillis())
                 CashCollectWidgetProvider.notifyDataChanged(context)
                 if (result.errors.isNotEmpty()) {
                     Toast.makeText(

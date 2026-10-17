@@ -55,6 +55,7 @@ import com.jayesh.cashcollect.ui.common.AppScreenTitle
 import com.jayesh.cashcollect.ui.common.GlassSurface
 import com.jayesh.cashcollect.ui.common.StatusBadge
 import com.jayesh.cashcollect.ui.theme.AppType
+import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
@@ -64,7 +65,6 @@ import com.jayesh.cashcollect.ui.theme.NothingMuted
 import com.jayesh.cashcollect.ui.theme.NothingRed
 import com.jayesh.cashcollect.ui.theme.NothingWhite
 import com.jayesh.cashcollect.ui.theme.TextDisplay
-import com.jayesh.cashcollect.ui.theme.TextMuted
 import com.jayesh.cashcollect.ui.theme.TextPrimary
 import com.jayesh.cashcollect.ui.theme.TextSecondary
 import java.text.SimpleDateFormat
