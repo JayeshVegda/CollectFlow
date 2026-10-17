@@ -43,11 +43,27 @@ object SampleHistory {
         if (database.collectionDao().countAll() > 0) return
 
         val seeds = listOf(
-            Seed("Sambhu", "3.5l", yesterday()),
-            Seed("Sambhu", "4.50l", lastTuesday()),
-            Seed("Naveenbhai", "2.5l", lastTuesday()),
-            Seed("Adeshbhai", "4l", september(11)),
-            Seed("Sambhu", "6l", september(12))
+            // Top frequent combination #1: Sambhu 3l (3 entries)
+            Seed("Sambhu", "3l", daysAgo(1)),
+            Seed("Sambhu", "3l", daysAgo(4)),
+            Seed("Sambhu", "3l", daysAgo(8)),
+
+            // Top frequent combination #2: Sambhu 1.5l (3 entries)
+            Seed("Sambhu", "1.5l", daysAgo(2)),
+            Seed("Sambhu", "1.5l", daysAgo(5)),
+            Seed("Sambhu", "1.5l", daysAgo(9)),
+
+            // Frequent combination #3: Naveenbhai 2l (2 entries)
+            Seed("Naveenbhai", "2l", daysAgo(3)),
+            Seed("Naveenbhai", "2l", daysAgo(7)),
+
+            // Frequent combination #4: Adeshbhai 4l (2 entries)
+            Seed("Adeshbhai", "4l", daysAgo(6)),
+            Seed("Adeshbhai", "4l", daysAgo(10)),
+
+            // Frequent combination #5: Sambhu 3.5l (2 entries)
+            Seed("Sambhu", "3.5l", daysAgo(11)),
+            Seed("Sambhu", "3.5l", daysAgo(14))
         )
 
         database.withTransaction {
@@ -87,9 +103,11 @@ object SampleHistory {
         set(Calendar.MILLISECOND, 0)
     }
 
-    private fun yesterday(): Long = todayAtSeedHour().apply {
-        add(Calendar.DAY_OF_YEAR, -1)
+    private fun daysAgo(days: Int): Long = todayAtSeedHour().apply {
+        add(Calendar.DAY_OF_YEAR, -days)
     }.timeInMillis
+
+    private fun yesterday(): Long = daysAgo(1)
 
     /**
      * The most recent Tuesday before today. The walk steps back before it looks, so on a Tuesday

@@ -36,9 +36,10 @@ class CashCollectTrackerWidgetProvider : AppWidgetProvider() {
             appWidgetIds: IntArray
         ) {
             CoroutineScope(Dispatchers.IO).launch {
-                val snapshot = loadWidgetSnapshot(context) ?: return@launch
+                runCatching {
+                    val snapshot = loadWidgetSnapshot(context) ?: return@launch
 
-                // Realized (collected today) figures
+                    // Realized (collected today) figures
                 val todayAmountFormatted = Paise(snapshot.todayTotalPaise).toFormattedRupees()
                 val commFormatted = "COMM: " + Paise(snapshot.todayCommissionPaise).toFormattedRupees()
                 val doneCountFormatted = if (snapshot.todayCount == 1) "1 DONE" else "${snapshot.todayCount} DONE"
@@ -129,7 +130,7 @@ class CashCollectTrackerWidgetProvider : AppWidgetProvider() {
 
                     appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
-            }
+            }.onFailure { it.printStackTrace() }
         }
     }
 }

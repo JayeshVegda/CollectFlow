@@ -102,12 +102,8 @@ fun QuickCaptureBottomSheet(
     var noteInput by remember { mutableStateOf("") }
     val parsed = remember(rawInput) { SmartInputParser.parse(rawInput) }
 
-    // The field takes focus the moment the sheet opens, so the keyboard is already up. The sheet
-    // is opened in order to type; making the operator tap the field first buys nothing.
+    // Soft keyboard does not auto-open on sheet open, leaving most frequent pills and options immediately visible.
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        runCatching { focusRequester.requestFocus() }
-    }
 
     // A parse counts only once it has both halves. The sheet previews and saves this one value
     // rather than re-parsing at each call site, so the preview can never disagree with what
@@ -162,8 +158,8 @@ fun QuickCaptureBottomSheet(
                     )
                     Spacer(modifier = Modifier.width(Space.sm))
                     Text(
-                        text = "QUICK CAPTURE",
-                        style = AppType.labelMonoLarge,
+                        text = "Quick capture",
+                        style = AppType.subheading,
                         color = NothingWhite
                     )
                 }
@@ -264,7 +260,7 @@ fun QuickCaptureBottomSheet(
                     Spacer(modifier = Modifier.width(Space.sm))
                     Text(
                         text = "comm " + Paise(computedCommission).toFormattedRupees(),
-                        style = AppType.labelMono,
+                        style = AppType.labelSm,
                         color = NothingGreen
                     )
                 }
@@ -312,8 +308,9 @@ fun QuickCaptureBottomSheet(
                 shape = RoundedCornerShape(Radius.pill)
             ) {
                 Text(
-                    text = "CONFIRM & SAVE",
-                    style = AppType.labelMono,
+                    text = "Confirm & Save",
+                    style = AppType.label,
+                    fontWeight = FontWeight.SemiBold,
                     color = if (preview != null) Color.Black else NothingMuted
                 )
             }
@@ -326,11 +323,11 @@ fun QuickCaptureBottomSheet(
                     .fillMaxWidth()
                     .height(Space.touchTarget),
                 shape = RoundedCornerShape(Radius.pill),
-                border = BorderStroke(1.dp, NothingBorderVisible)
+                border = BorderStroke(0.5.dp, NothingBorderVisible)
             ) {
                 Text(
-                    text = "OPEN FULL FORM",
-                    style = AppType.labelMono,
+                    text = "Open full form",
+                    style = AppType.label,
                     color = NothingGray
                 )
             }
@@ -365,11 +362,7 @@ private fun formatAmountShorthand(paise: Long): String {
 }
 
 /**
- * A horizontally scrolling row of tappable pills with a small mono label above it.
- *
- * Pills are 36dp tall rather than 48dp: two of these rows sit above the keyboard on a small
- * screen, the pills are wide enough to hit comfortably, and height is the only thing that
- * stops the sheet pushing CONFIRM & SAVE off-screen.
+ * A horizontally scrolling row of tappable pills with a small slim label above it.
  */
 @Composable
 private fun PillRow(
@@ -384,26 +377,27 @@ private fun PillRow(
             .fillMaxWidth()
             .padding(top = Space.md)
     ) {
-        Text(text = label, style = AppType.labelMono, color = TextTertiary)
-        Spacer(modifier = Modifier.height(Space.sm))
+        Text(text = label, style = AppType.labelSm, color = TextTertiary)
+        Spacer(modifier = Modifier.height(Space.xs))
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(Space.sm)
+            horizontalArrangement = Arrangement.spacedBy(Space.xs)
         ) {
             for (value in values) {
                 Box(
                     modifier = Modifier
-                        .height(36.dp)
+                        .height(32.dp)
                         .clip(RoundedCornerShape(Radius.pill))
+                        .background(NothingCard)
                         .clickable {
                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onPick(value)
                         }
-                        .border(1.dp, NothingBorderVisible, RoundedCornerShape(Radius.pill))
-                        .padding(horizontal = Space.md),
+                        .border(0.5.dp, NothingBorderVisible, RoundedCornerShape(Radius.pill))
+                        .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = value, style = AppType.bodySm, color = TextDisplay)

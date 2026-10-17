@@ -54,132 +54,146 @@ private const val TABULAR_FIGURES = "tnum"
 object AppType {
 
     /**
-     * Doto dot-matrix numerals, 48sp. Restricted to 36sp+ and to WHOLE NUMBERS ONLY.
-     *
-     * Verified glyph coverage: Doto's cmap has digits, comma and dot, but it does NOT
-     * contain the rupee sign (U+20B9) — Space Grotesk and Space Mono both do. So putting a
-     * money string in Doto makes Android silently font-fall-back for the ₹ alone, rendering
-     * the number in two typefaces. Use this for counts ("12 PARTIES", a day number) and
-     * never for currency — use [displayMoney] for money.
+     * Doto dot-matrix numerals, 30sp. Restricted to WHOLE NUMBERS ONLY.
      */
     val displayHero = TextStyle(
-        fontFamily = Doto,
-        fontWeight = FontWeight.Bold,
-        fontSize = 48.sp,
-        lineHeight = 50.sp,
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 30.sp,
+        lineHeight = 34.sp,
         letterSpacing = (-0.02).em
     )
 
     /**
-     * The money hero — the one "absurdly large" primary number on a screen.
-     *
-     * Space Grotesk Medium at 40sp with tabular figures: legible at a glance, has the ₹
-     * glyph, and aligns in columns. This is the Apple-style "one primary" slot.
+     * The money hero — crisp, slim, Apple Wallet style.
+     * Space Grotesk Medium at 28sp with tabular figures.
      */
     val displayMoney = TextStyle(
         fontFamily = SpaceGrotesk,
         fontWeight = FontWeight.Medium,
-        fontSize = 40.sp,
-        lineHeight = 44.sp,
+        fontSize = 28.sp,
+        lineHeight = 32.sp,
         letterSpacing = (-0.02).em,
         fontFeatureSettings = TABULAR_FIGURES
     )
 
-    /** Section hero: the big number on a card that is not THE hero. */
+    /** Section hero: 22sp Medium with tabular figures. */
     val displaySection = TextStyle(
         fontFamily = SpaceGrotesk,
         fontWeight = FontWeight.Medium,
-        fontSize = 36.sp,
-        lineHeight = 40.sp,
-        letterSpacing = (-0.02).em,
+        fontSize = 22.sp,
+        lineHeight = 26.sp,
+        letterSpacing = (-0.01).em,
         fontFeatureSettings = TABULAR_FIGURES
     )
 
-    /** Page titles. */
+    /** Page titles: 20sp Medium. */
     val heading = TextStyle(
         fontFamily = SpaceGrotesk,
         fontWeight = FontWeight.Medium,
-        fontSize = 24.sp,
-        lineHeight = 29.sp,
+        fontSize = 20.sp,
+        lineHeight = 24.sp,
         letterSpacing = (-0.01).em
     )
 
-    /** Row titles, customer names. */
+    /** Row titles, customer names: 15sp Medium. */
     val subheading = TextStyle(
         fontFamily = SpaceGrotesk,
         fontWeight = FontWeight.Medium,
-        fontSize = 18.sp,
-        lineHeight = 23.sp
-    )
-
-    /** Body text. */
-    val body = TextStyle(
-        fontFamily = SpaceGrotesk,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp
-    )
-
-    /** Secondary body, list meta lines. */
-    val bodySm = TextStyle(
-        fontFamily = SpaceGrotesk,
-        fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 21.sp,
-        letterSpacing = 0.01.em
-    )
-
-    /** Timestamps, footnotes. */
-    val caption = TextStyle(
-        fontFamily = SpaceGrotesk,
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 17.sp,
-        letterSpacing = 0.04.em
-    )
-
-    /**
-     * The ALL-CAPS monospace "instrument panel" label. 11sp with wide tracking.
-     * This is the app's most-used label style; it is deliberately small but never
-     * smaller than this, and always paired with readable [TextSecondary] or brighter.
-     */
-    val labelMono = TextStyle(
-        fontFamily = SpaceMono,
-        fontWeight = FontWeight.Bold,
-        fontSize = 11.sp,
-        lineHeight = 13.sp,
-        letterSpacing = 0.08.em
-    )
-
-    /** Slightly larger monospace label for section headers. */
-    val labelMonoLarge = TextStyle(
-        fontFamily = SpaceMono,
-        fontWeight = FontWeight.Bold,
-        fontSize = 12.sp,
-        lineHeight = 15.sp,
-        letterSpacing = 0.08.em
-    )
-
-    /** Monospace amount, standard size. Always right-aligned in columns. */
-    val amount = TextStyle(
-        fontFamily = SpaceMono,
-        fontWeight = FontWeight.Bold,
-        fontSize = 16.sp,
+        fontSize = 15.sp,
         lineHeight = 20.sp
     )
 
-    /** Monospace amount, emphasised (ledger rows). */
-    val amountLarge = TextStyle(
+    /** Body text: 14sp Regular. */
+    val body = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 20.sp
+    )
+
+    /** Secondary body, list meta lines: 13sp Regular. */
+    val bodySm = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+        letterSpacing = 0.01.em
+    )
+
+    /** Timestamps, footnotes: 11sp Regular. */
+    val caption = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+        lineHeight = 15.sp,
+        letterSpacing = 0.02.em
+    )
+
+    /**
+     * Clean, slim Apple-style label in Space Grotesk Medium. 12sp.
+     */
+    val label = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 15.sp,
+        letterSpacing = 0.02.em
+    )
+
+    /**
+     * Compact Apple-style label in Space Grotesk Medium. 11sp.
+     */
+    val labelSm = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 14.sp,
+        letterSpacing = 0.02.em
+    )
+
+    /**
+     * Monospace label for technical codes or serial indicators.
+     */
+    val labelMono = TextStyle(
         fontFamily = SpaceMono,
-        fontWeight = FontWeight.Bold,
-        fontSize = 19.sp,
-        lineHeight = 23.sp
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+        lineHeight = 13.sp,
+        letterSpacing = 0.05.em
+    )
+
+    /** Section header monospace label. */
+    val labelMonoLarge = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.04.em
+    )
+
+    /** Amount: 15sp Medium with tabular figures. */
+    val amount = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 15.sp,
+        lineHeight = 19.sp,
+        fontFeatureSettings = TABULAR_FIGURES
+    )
+
+    /** Emphasised amount: 17sp Medium with tabular figures. */
+    val amountLarge = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 17.sp,
+        lineHeight = 21.sp,
+        fontFeatureSettings = TABULAR_FIGURES
     )
 }
 
 /**
- * Material3 slots mapped onto the same scale so Material components (buttons, chips,
- * text fields) inherit the system rather than falling back to stock Roboto sizing.
+ * Material3 slots mapped onto the slim scale so Material components (buttons, chips,
+ * text fields) inherit the slim Apple aesthetic rather than chunky monospace defaults.
  */
 val Typography = Typography(
     displayLarge = AppType.displayHero,
@@ -192,14 +206,14 @@ val Typography = Typography(
 
     titleLarge = AppType.subheading,
     titleMedium = AppType.body.copy(fontWeight = FontWeight.Medium),
-    titleSmall = AppType.bodySm.copy(fontWeight = FontWeight.Medium),
+    titleSmall = AppType.label,
 
     bodyLarge = AppType.body,
     bodyMedium = AppType.bodySm,
     bodySmall = AppType.caption,
 
-    labelLarge = AppType.labelMonoLarge,
-    labelMedium = AppType.labelMono,
-    labelSmall = AppType.labelMono
+    labelLarge = AppType.label,
+    labelMedium = AppType.label,
+    labelSmall = AppType.labelSm
 )
 

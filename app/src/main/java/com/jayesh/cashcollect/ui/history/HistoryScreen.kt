@@ -197,7 +197,7 @@ fun HistoryScreen(
                 FilterChip(
                     selected = selectedStatus == null,
                     onClick = { onStatusSelect(null) },
-                    label = { Text("ALL", style = AppType.labelMono) },
+                    label = { Text("ALL", style = AppType.labelSm) },
                     colors = FilterChipDefaults.filterChipColors(
                         containerColor = NothingCard,
                         labelColor = NothingGray,
@@ -222,7 +222,7 @@ fun HistoryScreen(
                     FilterChip(
                         selected = selectedStatus == status,
                         onClick = { onStatusSelect(if (selectedStatus == status) null else status) },
-                        label = { Text(label, style = AppType.labelMono) },
+                        label = { Text(label, style = AppType.labelSm) },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = NothingCard,
                             labelColor = NothingGray,
@@ -256,20 +256,20 @@ fun HistoryScreen(
                     Column {
                         Text(
                             text = if (isFiltered) "FILTERED VOLUME" else "TOTAL VOLUME",
-                            style = AppType.labelMono,
+                            style = AppType.labelSm,
                             color = if (isFiltered) NothingAmber else TextSecondary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         AmountText(
                             amountPaise = totalPaise,
-                            style = AppType.amountLarge.copy(fontSize = 18.sp),
+                            style = AppType.amountLarge,
                             color = TextDisplay
                         )
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
                             text = "COMMISSION",
-                            style = AppType.labelMono,
+                            style = AppType.labelSm,
                             color = TextSecondary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
@@ -282,7 +282,7 @@ fun HistoryScreen(
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
                             text = "COUNT",
-                            style = AppType.labelMono,
+                            style = AppType.labelSm,
                             color = TextSecondary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
@@ -305,12 +305,12 @@ fun HistoryScreen(
             ) {
                 Text(
                     text = "${items.size} records",
-                    style = AppType.labelMono,
+                    style = AppType.labelSm,
                     color = NothingMuted
                 )
                 Text(
                     text = "SORT: ${sortOption.label.uppercase()}",
-                    style = AppType.labelMono,
+                    style = AppType.labelSm,
                     color = NothingGray,
                     modifier = Modifier.clickable { onToggleSort() }
                 )
@@ -363,12 +363,13 @@ fun HistoryScreen(
                             ) {
                                 Text(
                                     text = group.title,
-                                    style = AppType.labelMonoLarge,
+                                    style = AppType.label,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = NothingWhite
                                 )
                                 Text(
                                     text = "${group.items.size} · ${Paise(group.totalPaise).toFormattedRupees()}",
-                                    style = AppType.labelMono,
+                                    style = AppType.labelSm,
                                     color = NothingGray
                                 )
                             }
@@ -440,14 +441,14 @@ private fun HistoryRow(
                 Column {
                     Text(
                         text = formattedDate,
-                        style = AppType.labelMono,
+                        style = AppType.caption,
                         color = NothingGray
                     )
                     if (!isVoided && item.commissionPaise > 0) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "+${Paise(item.commissionPaise).toFormattedRupees()} comm",
-                            style = AppType.labelMono,
+                            style = AppType.labelSm,
                             color = NothingGreen
                         )
                     }

@@ -367,25 +367,25 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     NavItem(
                                         selected = currentScreen is Screen.Collections,
-                                        label = "COLLECT",
+                                        label = "Collect",
                                         icon = { Icon(Icons.Default.List, contentDescription = "Collections") },
                                         onClick = { goTo(Screen.Collections) }
                                     )
                                     NavItem(
                                         selected = currentScreen is Screen.Insights,
-                                        label = "INSIGHTS",
+                                        label = "Insights",
                                         icon = { Icon(Icons.Default.Analytics, contentDescription = "Insights") },
                                         onClick = { goTo(Screen.Insights) }
                                     )
                                     NavItem(
                                         selected = currentScreen is Screen.History,
-                                        label = "HISTORY",
+                                        label = "History",
                                         icon = { Icon(Icons.Default.History, contentDescription = "History") },
                                         onClick = { goTo(Screen.History) }
                                     )
                                     NavItem(
                                         selected = currentScreen is Screen.Settings,
-                                        label = "SETTINGS",
+                                        label = "Settings",
                                         icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                                         onClick = { goTo(Screen.Settings) }
                                     )
@@ -579,10 +579,10 @@ private fun androidx.compose.foundation.layout.RowScope.NavItem(
         icon = icon,
         label = {
             Text(
-                text = if (selected) "[ $label ]" else label,
-                style = AppType.labelMono,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 10.sp
+                text = label,
+                style = AppType.labelSm,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                fontSize = 11.sp
             )
         },
         colors = NavigationBarItemDefaults.colors(

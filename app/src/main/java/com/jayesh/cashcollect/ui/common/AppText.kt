@@ -41,13 +41,13 @@ fun AppSectionLabel(
     ) {
         Text(
             text = text.uppercase(),
-            style = AppType.labelMonoLarge,
+            style = AppType.label,
             color = color
         )
         if (count != null) {
             Text(
                 text = "  ($count)",
-                style = AppType.labelMono,
+                style = AppType.labelSm,
                 color = TextSecondary
             )
         }

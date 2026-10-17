@@ -50,9 +50,9 @@ import com.jayesh.cashcollect.ui.theme.TextSecondary
 @Composable
 fun AppScreenTitle(text: String, modifier: Modifier = Modifier) {
     Text(
-        text = text.uppercase(),
+        text = text,
         modifier = modifier,
-        style = AppType.labelMonoLarge,
+        style = AppType.heading,
         color = TextDisplay
     )
 }
@@ -86,7 +86,7 @@ fun AppPrimaryButton(
         contentPadding = PaddingValues(horizontal = Space.md, vertical = 0.dp)
     ) {
         ButtonGlyph(icon)
-        Text(text = label, style = AppType.labelMono)
+        Text(text = label, style = AppType.label, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
     }
 }
 
@@ -119,7 +119,7 @@ fun AppOutlinedButton(
         contentPadding = PaddingValues(horizontal = Space.md, vertical = 0.dp)
     ) {
         ButtonGlyph(icon)
-        Text(text = label, style = AppType.labelMono)
+        Text(text = label, style = AppType.label)
     }
 }
 

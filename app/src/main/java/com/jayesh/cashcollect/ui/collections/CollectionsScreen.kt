@@ -256,8 +256,8 @@ fun CollectionsScreen(
                         )
                         Spacer(modifier = Modifier.width(Space.sm))
                         Text(
-                            text = "COLLECTFLOW",
-                            style = AppType.labelMonoLarge,
+                            text = "CollectFlow",
+                            style = AppType.subheading,
                             color = TextDisplay
                         )
                     }
@@ -283,7 +283,7 @@ fun CollectionsScreen(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(Space.xs))
-                Text(text = "QUICK CAPTURE", style = AppType.labelMono, color = Color.Black)
+                Text(text = "Quick capture", style = AppType.label, fontWeight = FontWeight.SemiBold, color = Color.Black)
             }
         }
     ) { paddingValues ->
@@ -560,7 +560,7 @@ private fun SummaryStrip(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "TO COLLECT", style = AppType.labelMono, color = TextSecondary)
+                Text(text = "TO COLLECT", style = AppType.labelSm, color = TextSecondary)
                 Spacer(modifier = Modifier.height(Space.xs))
                 AmountText(
                     amountPaise = toCollectPaise,
@@ -582,7 +582,7 @@ private fun SummaryStrip(
             ) {
                 Text(
                     text = "COLLECTED TODAY",
-                    style = AppType.labelMono,
+                    style = AppType.labelSm,
                     color = TextSecondary
                 )
                 Spacer(modifier = Modifier.height(Space.xs))
@@ -810,7 +810,7 @@ private fun SwipeBackdrop(startLabel: String, endLabel: String) {
                 .padding(horizontal = Space.md),
             contentAlignment = Alignment.CenterStart
         ) {
-            Text(text = startLabel, style = AppType.labelMono, color = NothingGreen)
+            Text(text = startLabel, style = AppType.labelSm, color = NothingGreen)
         }
         Box(
             modifier = Modifier
@@ -819,7 +819,7 @@ private fun SwipeBackdrop(startLabel: String, endLabel: String) {
                 .padding(horizontal = Space.md),
             contentAlignment = Alignment.CenterEnd
         ) {
-            Text(text = endLabel, style = AppType.labelMono, color = NothingRed)
+            Text(text = endLabel, style = AppType.labelSm, color = NothingRed)
         }
     }
 }
@@ -853,7 +853,8 @@ private fun BulkActionBar(
             ) {
                 Text(
                     text = selectedCount.toString() + " SELECTED",
-                    style = AppType.labelMonoLarge,
+                    style = AppType.label,
+                    fontWeight = FontWeight.SemiBold,
                     color = TextDisplay
                 )
                 OutlinedButton(
@@ -861,7 +862,7 @@ private fun BulkActionBar(
                     shape = RoundedCornerShape(Radius.pill),
                     border = BorderStroke(1.dp, SurfaceDivider)
                 ) {
-                    Text(text = "CANCEL", style = AppType.labelMono, color = TextSecondary)
+                    Text(text = "CANCEL", style = AppType.labelSm, color = TextSecondary)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
@@ -879,7 +880,8 @@ private fun BulkActionBar(
                     ) {
                         Text(
                             text = "RECEIVED " + pendingCount,
-                            style = AppType.labelMono,
+                            style = AppType.label,
+                            fontWeight = FontWeight.SemiBold,
                             color = Color.Black
                         )
                     }
@@ -898,7 +900,8 @@ private fun BulkActionBar(
                     ) {
                         Text(
                             text = "REPORTED " + reportCount,
-                            style = AppType.labelMono,
+                            style = AppType.label,
+                            fontWeight = FontWeight.SemiBold,
                             color = Color.Black
                         )
                     }
