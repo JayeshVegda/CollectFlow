@@ -56,8 +56,21 @@ class CashCollectWidgetProvider : AppWidgetProvider() {
                     0xFF4A9E5C.toInt() // Nothing Green
                 }
 
+                val labelText = if (snapshot.pendingTotalPaise > 0L) {
+                    "PENDING: " + Paise(snapshot.pendingTotalPaise).toShortRupeeString()
+                } else {
+                    "TODAY'S CASH"
+                }
+                val labelColor = if (snapshot.pendingTotalPaise > 0L) {
+                    0xFFD4A843.toInt()
+                } else {
+                    0xFF9E9EA7.toInt()
+                }
+
                 for (appWidgetId in appWidgetIds) {
                     val views = RemoteViews(context.packageName, R.layout.widget_cash_collect).apply {
+                        setTextViewText(R.id.widget_label, labelText)
+                        setTextColor(R.id.widget_label, labelColor)
                         setTextViewText(R.id.widget_today_amount, amountFormatted)
                         setTextViewText(R.id.widget_unconfirmed_status, unconfirmedText)
                         setTextColor(R.id.widget_unconfirmed_status, unconfirmedColor)

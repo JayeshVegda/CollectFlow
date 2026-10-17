@@ -39,13 +39,14 @@ class CashCollectMiniWidgetProvider : AppWidgetProvider() {
                 // Collected cash only, over the one shared definition of "today".
                 val snapshot = loadWidgetSnapshot(context) ?: return@launch
 
-                val amountFormatted = Paise(snapshot.todayTotalPaise).toFormattedRupees()
-                val statusText = if (snapshot.awaitingReportCount > 0) {
+                val statusText = if (snapshot.pendingTotalPaise > 0L) {
+                    "${Paise(snapshot.pendingTotalPaise).toShortRupeeString()} PENDING"
+                } else if (snapshot.awaitingReportCount > 0) {
                     "${snapshot.awaitingReportCount} UNSENT"
                 } else {
-                    "ALL CONFIRMED"
+                    "✓ ALL CLEAR"
                 }
-                val statusColor = if (snapshot.awaitingReportCount > 0) {
+                val statusColor = if (snapshot.pendingTotalPaise > 0L || snapshot.awaitingReportCount > 0) {
                     0xFFD4A843.toInt()
                 } else {
                     0xFF4A9E5C.toInt()

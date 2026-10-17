@@ -36,23 +36,38 @@ class CashCollectTrackerWidgetProvider : AppWidgetProvider() {
             appWidgetIds: IntArray
         ) {
             CoroutineScope(Dispatchers.IO).launch {
-                // Collected cash only, over the one shared definition of "today".
                 val snapshot = loadWidgetSnapshot(context) ?: return@launch
 
-                val amountFormatted = Paise(snapshot.todayTotalPaise).toFormattedRupees()
+                // Realized (collected today) figures
+                val todayAmountFormatted = Paise(snapshot.todayTotalPaise).toFormattedRupees()
                 val commFormatted = "COMM: " + Paise(snapshot.todayCommissionPaise).toFormattedRupees()
-                val countFormatted = if (snapshot.todayCount == 1) {
-                    "1 ENTRY"
+                val doneCountFormatted = if (snapshot.todayCount == 1) "1 DONE" else "${snapshot.todayCount} DONE"
+
+                // Pending (to collect) figures
+                val hasPending = snapshot.pendingTotalPaise > 0L
+                val pendingAmountFormatted = if (hasPending) {
+                    Paise(snapshot.pendingTotalPaise).toFormattedRupees()
                 } else {
-                    "${snapshot.todayCount} ENTRIES"
+                    "✓ ALL CLEAR"
+                }
+                val pendingAmountColor = if (hasPending) {
+                    0xFFFFFFFF.toInt() // White
+                } else {
+                    0xFF4A9E5C.toInt() // Nothing Green
+                }
+                val pendingSubText = if (hasPending) {
+                    "${snapshot.pendingPartyCount} PARTIES • ${snapshot.pendingCount} ENTRIES"
+                } else {
+                    "0 PENDING COLLECTIONS"
                 }
 
-                val unconfirmedText = if (snapshot.awaitingReportCount > 0) {
-                    "⚠️ ${snapshot.awaitingReportCount} UNSENT RECEIPTS"
+                // Status alert (unreported cash receipts)
+                val statusText = if (snapshot.awaitingReportCount > 0) {
+                    "⚠️ ${snapshot.awaitingReportCount} TO REPORT"
                 } else {
-                    "✓ ALL CONFIRMED"
+                    "✓ ALL REPORTED"
                 }
-                val unconfirmedColor = if (snapshot.awaitingReportCount > 0) {
+                val statusColor = if (snapshot.awaitingReportCount > 0) {
                     0xFFD4A843.toInt() // Nothing Amber
                 } else {
                     0xFF4A9E5C.toInt() // Nothing Green
@@ -60,11 +75,19 @@ class CashCollectTrackerWidgetProvider : AppWidgetProvider() {
 
                 for (appWidgetId in appWidgetIds) {
                     val views = RemoteViews(context.packageName, R.layout.widget_cash_collect_wide).apply {
-                        setTextViewText(R.id.widget_wide_today_amount, amountFormatted)
+                        // Pending / To Collect Block
+                        setTextViewText(R.id.widget_wide_pending_amount, pendingAmountFormatted)
+                        setTextColor(R.id.widget_wide_pending_amount, pendingAmountColor)
+                        setTextViewText(R.id.widget_wide_pending_sub, pendingSubText)
+
+                        // Realized / Collected Today Block
+                        setTextViewText(R.id.widget_wide_today_amount, todayAmountFormatted)
                         setTextViewText(R.id.widget_wide_commission, commFormatted)
-                        setTextViewText(R.id.widget_wide_count, countFormatted)
-                        setTextViewText(R.id.widget_wide_status, unconfirmedText)
-                        setTextColor(R.id.widget_wide_status, unconfirmedColor)
+                        setTextViewText(R.id.widget_wide_count, doneCountFormatted)
+
+                        // Status alert
+                        setTextViewText(R.id.widget_wide_status, statusText)
+                        setTextColor(R.id.widget_wide_status, statusColor)
 
                         // Tap whole container opens app
                         val openAppIntent = Intent(context, MainActivity::class.java).apply {

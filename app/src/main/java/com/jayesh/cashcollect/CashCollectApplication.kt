@@ -3,6 +3,7 @@ package com.jayesh.cashcollect
 import android.app.Application
 import android.util.Log
 import com.jayesh.cashcollect.data.backup.CsvExporter
+import com.jayesh.cashcollect.data.backup.CsvImporter
 import com.jayesh.cashcollect.data.backup.EncryptedBackupManager
 import com.jayesh.cashcollect.data.local.AppDatabase
 import com.jayesh.cashcollect.data.local.SampleHistory
@@ -24,6 +25,7 @@ class CashCollectApplication : Application() {
     lateinit var notificationManager: AppNotificationManager private set
     lateinit var backupManager: EncryptedBackupManager private set
     lateinit var csvExporter: CsvExporter private set
+    lateinit var csvImporter: CsvImporter private set
 
     override fun onCreate() {
         super.onCreate()
@@ -42,6 +44,7 @@ class CashCollectApplication : Application() {
         notificationManager = AppNotificationManager(this)
         backupManager = EncryptedBackupManager(this, database)
         csvExporter = CsvExporter(this)
+        csvImporter = CsvImporter(database)
 
         // Pre-filled operating history (see SampleHistory). Fire-and-forget and failure-tolerant:
         // seeding must never delay or crash startup, and it no-ops once the operator has data.

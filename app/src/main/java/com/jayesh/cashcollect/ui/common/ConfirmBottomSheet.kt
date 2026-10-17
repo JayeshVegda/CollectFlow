@@ -23,12 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
+import com.jayesh.cashcollect.ui.theme.AppType
 import com.jayesh.cashcollect.ui.theme.NothingBorder
 import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
 import com.jayesh.cashcollect.ui.theme.NothingCard
@@ -49,7 +49,7 @@ fun ConfirmBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = NothingCard,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Column(
             modifier = Modifier
@@ -60,10 +60,7 @@ fun ConfirmBottomSheet(
         ) {
             Text(
                 text = "CONFIRM CASH RECEIPT",
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                letterSpacing = 1.sp,
+                style = AppType.labelMonoLarge,
                 color = NothingGray
             )
 
@@ -82,12 +79,13 @@ fun ConfirmBottomSheet(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "Customer", color = NothingGray, fontSize = 13.sp)
+                        Text(text = "Customer", style = AppType.bodySm, color = NothingGray)
                         Text(
                             text = collection.customerDisplayName,
-                            fontWeight = FontWeight.SemiBold,
+                            style = AppType.subheading,
                             color = NothingWhite
                         )
                     }
@@ -97,25 +95,23 @@ fun ConfirmBottomSheet(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "Cash Amount", color = NothingGray, fontSize = 13.sp)
+                        Text(text = "Cash Amount", style = AppType.bodySm, color = NothingGray)
                         Text(
                             text = Paise(collection.amountPaise).toFormattedRupees(),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 24.sp,
+                            style = AppType.amountLarge.copy(fontSize = 22.sp),
                             color = NothingWhite
                         )
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "Commission to Pay", color = NothingGray, fontSize = 13.sp)
+                        Text(text = "Commission to Pay", style = AppType.bodySm, color = NothingGray)
                         Text(
                             text = Paise(collection.commissionPaise).toFormattedRupees(),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.SemiBold,
+                            style = AppType.amount,
                             color = NothingRed
                         )
                     }
@@ -125,11 +121,11 @@ fun ConfirmBottomSheet(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = "Note", color = NothingGray, fontSize = 13.sp)
+                            Text(text = "Note", style = AppType.bodySm, color = NothingGray)
                             Text(
                                 text = collection.note,
-                                color = NothingWhite,
-                                fontSize = 13.sp
+                                style = AppType.bodySm,
+                                color = NothingWhite
                             )
                         }
                     }
@@ -140,7 +136,7 @@ fun ConfirmBottomSheet(
 
             Text(
                 text = "Receipt will be recorded locally and WhatsApp will open.",
-                fontSize = 12.sp,
+                style = AppType.caption,
                 color = NothingGray
             )
 
@@ -159,10 +155,7 @@ fun ConfirmBottomSheet(
             ) {
                 Text(
                     text = "RECEIVE & OPEN WHATSAPP",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    letterSpacing = 0.5.sp,
+                    style = AppType.labelMonoLarge,
                     color = Color.Black
                 )
             }
@@ -177,7 +170,7 @@ fun ConfirmBottomSheet(
                 shape = RoundedCornerShape(999.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, NothingBorderVisible)
             ) {
-                Text("CANCEL", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingGray)
+                Text("CANCEL", style = AppType.labelMono, color = NothingGray)
             }
         }
     }

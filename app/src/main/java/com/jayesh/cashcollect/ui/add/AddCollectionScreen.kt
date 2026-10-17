@@ -60,6 +60,7 @@ import com.jayesh.cashcollect.domain.money.CommissionCalculator
 import com.jayesh.cashcollect.domain.money.Paise
 import com.jayesh.cashcollect.ui.common.AppScreenTitle
 import com.jayesh.cashcollect.ui.common.AmountKeypad
+import com.jayesh.cashcollect.ui.theme.AppType
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
@@ -131,10 +132,7 @@ fun AddCollectionScreen(
             // 1. CUSTOMER SELECTOR
             Text(
                 text = "1. PARTY / CUSTOMER",
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                letterSpacing = 1.sp,
+                style = AppType.labelMonoLarge,
                 color = NothingGray
             )
 
@@ -156,19 +154,17 @@ fun AddCollectionScreen(
                         Column {
                             Text(
                                 text = selectedCustomer!!.displayName,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp,
+                                style = AppType.subheading,
                                 color = NothingWhite
                             )
                             Text(
                                 text = "SELECTED PARTY",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
+                                style = AppType.labelMono,
                                 color = NothingRed
                             )
                         }
                         TextButton(onClick = { selectedCustomer = null }) {
-                            Text("CHANGE", fontFamily = FontFamily.Monospace, color = NothingGray)
+                            Text("CHANGE", style = AppType.labelMono, color = NothingGray)
                         }
                     }
                 }
@@ -209,8 +205,8 @@ fun AddCollectionScreen(
                                     .padding(vertical = 10.dp, horizontal = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(customer.displayName, fontWeight = FontWeight.Medium, color = NothingWhite)
-                                Text("SELECT", fontFamily = FontFamily.Monospace, color = NothingRed, fontSize = 12.sp)
+                                Text(customer.displayName, style = AppType.body, color = NothingWhite)
+                                Text("SELECT", style = AppType.labelMono, color = NothingRed)
                             }
                         }
 
@@ -230,15 +226,14 @@ fun AddCollectionScreen(
                             Text(
                                 text = "Add \"$searchQuery\" as new party",
                                 color = NothingRed,
-                                fontWeight = FontWeight.Bold
+                                style = AppType.bodySm.copy(fontWeight = FontWeight.Bold)
                             )
                         }
                     }
                 } else if (recentCustomers.isNotEmpty()) {
                     Text(
                         text = "RECENT PARTIES",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
+                        style = AppType.labelMono,
                         color = NothingGray
                     )
                     FlowRow(
@@ -269,10 +264,7 @@ fun AddCollectionScreen(
             // 2. AMOUNT & COMMISSION DISPLAY
             Text(
                 text = "2. AMOUNT & COMMISSION",
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                letterSpacing = 1.sp,
+                style = AppType.labelMonoLarge,
                 color = NothingGray
             )
 
@@ -286,16 +278,13 @@ fun AddCollectionScreen(
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
                         text = "CASH AMOUNT",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
+                        style = AppType.labelMono,
                         color = NothingGray
                     )
 
                     Text(
                         text = if (amountRupees > 0) Paise.fromRupees(amountRupees).toFormattedRupees() else "₹0",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Bold,
+                        style = AppType.displayMoney,
                         color = if (amountRupees > 0) NothingWhite else NothingMuted
                     )
 
@@ -303,18 +292,17 @@ fun AddCollectionScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "Commission (${commissionRatePerThousand}/1000):",
-                            fontSize = 13.sp,
+                            style = AppType.bodySm,
                             color = NothingGray
                         )
                         Text(
                             text = Paise(computedCommissionPaise).toFormattedRupees(),
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = AppType.amountLarge,
                             color = NothingGreen
                         )
                     }
@@ -347,9 +335,7 @@ fun AddCollectionScreen(
                     ) {
                         Text(
                             text = label,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            style = AppType.labelMono,
                             color = NothingWhite
                         )
                     }
@@ -422,10 +408,7 @@ fun AddCollectionScreen(
             ) {
                 Text(
                     text = "SAVE PENDING COLLECTION",
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
+                    style = AppType.labelMonoLarge,
                     color = if (selectedCustomer != null && amountPaise > 0L) Color.Black else NothingMuted
                 )
             }
@@ -441,7 +424,7 @@ fun AddCollectionScreen(
             containerColor = NothingCardRaised,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
-            title = { Text("NEW PARTY", fontFamily = FontFamily.Monospace, color = NothingWhite) },
+            title = { Text("NEW PARTY", style = AppType.subheading, color = NothingWhite) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -494,12 +477,12 @@ fun AddCollectionScreen(
                     ),
                     shape = RoundedCornerShape(999.dp)
                 ) {
-                    Text("SAVE", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color.Black)
+                    Text("SAVE", style = AppType.labelMono, color = Color.Black)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showNewCustomerDialog = false }) {
-                    Text("CANCEL", fontFamily = FontFamily.Monospace, color = NothingGray)
+                    Text("CANCEL", style = AppType.labelMono, color = NothingGray)
                 }
             }
         )
@@ -513,10 +496,11 @@ fun AddCollectionScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
             icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = NothingAmber) },
-            title = { Text("DUPLICATE WARNING", fontFamily = FontFamily.Monospace, color = NothingWhite) },
+            title = { Text("DUPLICATE WARNING", style = AppType.subheading, color = NothingWhite) },
             text = {
                 Text(
                     "A collection for ${selectedCustomer?.displayName} of ${Paise(amountPaise).toFormattedRupees()} was already recorded within the last 30 minutes.\n\nSave anyway?",
+                    style = AppType.bodySm,
                     color = NothingWhite
                 )
             },
@@ -532,12 +516,12 @@ fun AddCollectionScreen(
                     ),
                     shape = RoundedCornerShape(999.dp)
                 ) {
-                    Text("SAVE ANYWAY", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color.Black)
+                    Text("SAVE ANYWAY", style = AppType.labelMono, color = Color.Black)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDuplicateWarningDialog = false }) {
-                    Text("CANCEL", fontFamily = FontFamily.Monospace, color = NothingGray)
+                    Text("CANCEL", style = AppType.labelMono, color = NothingGray)
                 }
             }
         )

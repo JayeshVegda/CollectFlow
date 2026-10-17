@@ -50,6 +50,11 @@ class CollectionRepository(
             .flowOn(Dispatchers.Default)
     }
 
+    fun getFrequentCombinations(limit: Int = 8): Flow<List<com.jayesh.cashcollect.data.local.dao.FrequentCombination>> {
+        return collectionDao.getFrequentCombinations(limit)
+            .flowOn(Dispatchers.Default)
+    }
+
     suspend fun getCollectionById(id: Long): CollectionItem? {
         return collectionDao.getWithCustomerById(id)?.toDomain()
     }

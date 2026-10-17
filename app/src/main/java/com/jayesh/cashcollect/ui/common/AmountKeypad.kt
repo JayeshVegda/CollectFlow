@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.jayesh.cashcollect.ui.theme.AppType
 import com.jayesh.cashcollect.ui.theme.NothingBorder
 import com.jayesh.cashcollect.ui.theme.NothingCardRaised
 import com.jayesh.cashcollect.ui.theme.NothingWhite
@@ -91,9 +91,7 @@ private fun KeypadButton(
         } else {
             Text(
                 text = key,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
+                style = AppType.amountLarge.copy(fontSize = 22.sp),
                 color = NothingWhite
             )
         }

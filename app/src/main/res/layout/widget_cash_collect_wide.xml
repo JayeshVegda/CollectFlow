@@ -5,9 +5,9 @@
     android:layout_height="match_parent"
     android:background="@drawable/bg_nothing_widget"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="14dp">
 
-    <!-- Top Row: Header & Transaction Count -->
+    <!-- Top Row: App Brand & Status -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -28,7 +28,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="4dp"
-            android:text="// TODAY"
+            android:text="// LIVE TRACKER"
             android:textColor="#999999"
             android:textSize="10sp"
             android:letterSpacing="0.08" />
@@ -37,43 +37,111 @@
             android:id="@+id/widget_wide_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="0 ENTRIES"
-            android:textColor="#666666"
+            android:text="0 DONE"
+            android:textColor="#888888"
             android:textSize="10sp"
             android:textStyle="bold"
             android:letterSpacing="0.08" />
     </LinearLayout>
 
-    <!-- Center Metric: Hero Cash & Commission -->
+    <!-- Center Section: Dual Metric Display (TO COLLECT vs COLLECTED TODAY) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginVertical="4dp">
+        android:layout_marginVertical="2dp">
 
-        <TextView
-            android:id="@+id/widget_wide_today_amount"
-            android:layout_width="wrap_content"
+        <!-- Left Column: TO COLLECT / PENDING -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="₹0"
-            android:textColor="#FFFFFF"
-            android:textSize="28sp"
-            android:textStyle="bold" />
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/widget_wide_commission"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/widget_wide_pending_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TO COLLECT"
+                android:textColor="#D4A843"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08" />
+
+            <TextView
+                android:id="@+id/widget_wide_pending_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₹0"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/widget_wide_pending_sub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 PENDING"
+                android:textColor="#888888"
+                android:textSize="10sp"
+                android:letterSpacing="0.04"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <!-- Divider Line -->
+        <View
+            android:layout_width="1dp"
+            android:layout_height="44dp"
+            android:layout_marginHorizontal="10dp"
+            android:background="#222222" />
+
+        <!-- Right Column: COLLECTED TODAY -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="COMM: ₹0"
-            android:textColor="#4A9E5C"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.04" />
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="COLLECTED TODAY"
+                android:textColor="#999999"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08" />
+
+            <TextView
+                android:id="@+id/widget_wide_today_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₹0"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/widget_wide_commission"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="COMM: ₹0"
+                android:textColor="#4A9E5C"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.04"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- Bottom Row: Status Alert & Action Pills -->
+    <!-- Bottom Row: Alert Status & Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -85,10 +153,13 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="✓ All confirmed"
+            android:text="✓ ALL REPORTED"
             android:textColor="#4A9E5C"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -100,8 +171,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_nothing_btn_pill_outline"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="8dp"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="6dp"
                 android:layout_marginEnd="6dp"
                 android:gravity="center">
 
@@ -110,7 +181,7 @@
                     android:layout_height="wrap_content"
                     android:text="OPEN"
                     android:textColor="#E8E8E8"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.06" />
             </LinearLayout>
@@ -120,8 +191,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_nothing_btn_pill_white"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="8dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
                 android:gravity="center">
 
                 <TextView
@@ -129,7 +200,7 @@
                     android:layout_height="wrap_content"
                     android:text="+ QUICK"
                     android:textColor="#000000"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.06" />
             </LinearLayout>

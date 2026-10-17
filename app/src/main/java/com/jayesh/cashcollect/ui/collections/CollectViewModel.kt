@@ -124,6 +124,10 @@ class CollectViewModel(
         customerRepo.getRecentCustomers(RECENT_CUSTOMER_LIMIT)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val frequentCombinations: StateFlow<List<com.jayesh.cashcollect.data.local.dao.FrequentCombination>> =
+        collectionRepo.getFrequentCombinations(8)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _isQuickCaptureOpen = MutableStateFlow(false)
     val isQuickCaptureOpen: StateFlow<Boolean> = _isQuickCaptureOpen.asStateFlow()
 

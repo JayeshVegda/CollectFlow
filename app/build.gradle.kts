@@ -9,7 +9,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.jayesh.cashcollect"
+        applicationId = "com.jayesh.cashcollect.beta"
         minSdk = 26
         targetSdk = 34
         versionCode = 2

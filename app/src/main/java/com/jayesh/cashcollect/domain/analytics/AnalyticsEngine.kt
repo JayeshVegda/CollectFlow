@@ -8,6 +8,7 @@ import java.util.Date
 import java.util.Locale
 
 data class CustomerVolume(
+    val customerId: Long = 0L,
     val customerName: String,
     val customerAlias: String?,
     val totalAmountPaise: Long,
@@ -44,6 +45,26 @@ data class InsightsSummary(
     val topCustomers: List<CustomerVolume>,
     val last7DaysTrend: List<DailyTrendBucket>,
     val last6MonthsTrend: List<MonthlyBucket>
+)
+
+enum class InsightsTimeframe(val label: String) {
+    TODAY("TODAY"),
+    LAST_7_DAYS("7 DAYS"),
+    THIS_MONTH("THIS MONTH"),
+    ALL_TIME("ALL TIME")
+}
+
+data class TimeframeStats(
+    val timeframe: InsightsTimeframe,
+    val realizedTotalPaise: Long,
+    val commissionPaise: Long,
+    val transactionCount: Int,
+    val pendingTotalPaise: Long,
+    val pendingCount: Int,
+    val avgTransactionPaise: Long,
+    val topCustomers: List<CustomerVolume>,
+    val trendBuckets: List<DailyTrendBucket>,
+    val peakDayLabel: String? = null
 )
 
 object AnalyticsEngine {
@@ -107,6 +128,7 @@ object AnalyticsEngine {
             val current = customerMap[key]
             customerMap[key] = if (current == null) {
                 CustomerVolume(
+                    customerId = item.customerId,
                     customerName = item.customerName,
                     customerAlias = item.customerAlias,
                     totalAmountPaise = item.amountPaise,
@@ -207,6 +229,123 @@ object AnalyticsEngine {
             topCustomers = topCustomers,
             last7DaysTrend = trendBuckets,
             last6MonthsTrend = monthBuckets
+        )
+    }
+
+    fun computeTimeframeStats(collections: List<CollectionItem>, timeframe: InsightsTimeframe): TimeframeStats {
+        val nowCal = Calendar.getInstance()
+        val startOfToday = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val windowStart = when (timeframe) {
+            InsightsTimeframe.TODAY -> startOfToday
+            InsightsTimeframe.LAST_7_DAYS -> Calendar.getInstance().apply {
+                timeInMillis = startOfToday
+                add(Calendar.DAY_OF_YEAR, -6)
+            }.timeInMillis
+            InsightsTimeframe.THIS_MONTH -> Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            InsightsTimeframe.ALL_TIME -> 0L
+        }
+
+        val inWindow = collections.filter { item ->
+            val t = item.receivedAt ?: item.createdAt
+            t >= windowStart
+        }
+
+        val realized = inWindow.filter {
+            it.status == CollectionStatus.RECEIPT_CONFIRMED || it.status == CollectionStatus.CONFIRMED
+        }
+        val pending = inWindow.filter { it.status == CollectionStatus.PENDING }
+
+        val realizedTotalPaise = realized.sumOf { it.amountPaise }
+        val commissionPaise = realized.sumOf { it.commissionPaise }
+        val count = realized.size
+        val pendingTotalPaise = pending.sumOf { it.amountPaise }
+        val pendingCount = pending.size
+        val avgTxn = if (count > 0) realizedTotalPaise / count else 0L
+
+        // Customer breakdown inside this timeframe
+        val customerMap = mutableMapOf<String, CustomerVolume>()
+        for (item in realized) {
+            val key = item.customerDisplayName
+            val current = customerMap[key]
+            customerMap[key] = if (current == null) {
+                CustomerVolume(
+                    customerId = item.customerId,
+                    customerName = item.customerName,
+                    customerAlias = item.customerAlias,
+                    totalAmountPaise = item.amountPaise,
+                    transactionCount = 1
+                )
+            } else {
+                current.copy(
+                    totalAmountPaise = current.totalAmountPaise + item.amountPaise,
+                    transactionCount = current.transactionCount + 1
+                )
+            }
+        }
+        val topCustomers = customerMap.values
+            .sortedByDescending { it.totalAmountPaise }
+            .take(8)
+
+        // 7-day trend buckets for velocity visualization
+        val allRealized = collections.filter {
+            it.status == CollectionStatus.RECEIPT_CONFIRMED || it.status == CollectionStatus.CONFIRMED
+        }
+        val trendBuckets = mutableListOf<DailyTrendBucket>()
+        val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
+        val dateFormat = SimpleDateFormat("dd/MM", Locale.getDefault())
+
+        for (i in 6 downTo 0) {
+            val loopCal = Calendar.getInstance().apply {
+                timeInMillis = startOfToday
+                add(Calendar.DAY_OF_YEAR, -i)
+            }
+            val dayStart = loopCal.timeInMillis
+            val dayEnd = dayStart + (24 * 60 * 60 * 1000L) - 1
+
+            val dayItems = allRealized.filter {
+                val t = it.receivedAt ?: it.createdAt
+                t in dayStart..dayEnd
+            }
+
+            trendBuckets.add(
+                DailyTrendBucket(
+                    dayLabel = if (i == 0) "Today" else dayFormat.format(Date(dayStart)),
+                    dateLabel = dateFormat.format(Date(dayStart)),
+                    totalPaise = dayItems.sumOf { it.amountPaise },
+                    count = dayItems.size
+                )
+            )
+        }
+
+        // Peak day identification
+        val maxBucket = trendBuckets.maxByOrNull { it.totalPaise }
+        val peakDayLabel = if (maxBucket != null && maxBucket.totalPaise > 0L) {
+            "Peak: ${maxBucket.dayLabel} (${maxBucket.dateLabel})"
+        } else null
+
+        return TimeframeStats(
+            timeframe = timeframe,
+            realizedTotalPaise = realizedTotalPaise,
+            commissionPaise = commissionPaise,
+            transactionCount = count,
+            pendingTotalPaise = pendingTotalPaise,
+            pendingCount = pendingCount,
+            avgTransactionPaise = avgTxn,
+            topCustomers = topCustomers,
+            trendBuckets = trendBuckets,
+            peakDayLabel = peakDayLabel
         )
     }
 }

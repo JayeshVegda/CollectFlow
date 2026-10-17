@@ -60,6 +60,7 @@ import com.jayesh.cashcollect.ui.common.AppScreenTitle
 import com.jayesh.cashcollect.ui.common.ConfirmBottomSheet
 import com.jayesh.cashcollect.ui.common.EditCollectionBottomSheet
 import com.jayesh.cashcollect.ui.common.StatusBadge
+import com.jayesh.cashcollect.ui.theme.AppType
 import com.jayesh.cashcollect.ui.theme.NothingAmber
 import com.jayesh.cashcollect.ui.theme.NothingAmberBg
 import com.jayesh.cashcollect.ui.theme.NothingAmberBorder
@@ -152,8 +153,7 @@ fun CollectionDetailScreen(
             // Customer Name — tapping it opens this party's ledger.
             Text(
                 text = collection.customerDisplayName,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
+                style = AppType.heading,
                 color = NothingWhite,
                 modifier = Modifier.clickable { onPartyClick(collection.customerId) }
             )
@@ -161,9 +161,7 @@ fun CollectionDetailScreen(
             // Amount
             Text(
                 text = Paise(collection.amountPaise).toFormattedRupees(),
-                fontFamily = FontFamily.Monospace,
-                fontSize = 38.sp,
-                fontWeight = FontWeight.Bold,
+                style = AppType.displayMoney,
                 color = NothingWhite
             )
 
@@ -185,21 +183,18 @@ fun CollectionDetailScreen(
                     Column {
                         Text(
                             text = "COMMISSION TO PAY",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
+                            style = AppType.labelMono,
                             color = NothingGray
                         )
                         Text(
                             text = "Rate snapshotted: ${collection.commissionRateSnapshot}/1000",
-                            fontSize = 12.sp,
+                            style = AppType.caption,
                             color = NothingGray
                         )
                     }
                     Text(
                         text = Paise(collection.commissionPaise).toFormattedRupees(),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
+                        style = AppType.amountLarge,
                         color = NothingGreen
                     )
                 }
@@ -217,12 +212,11 @@ fun CollectionDetailScreen(
                     Column(modifier = Modifier.padding(14.dp)) {
                         Text(
                             text = "NOTE",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
+                            style = AppType.labelMono,
                             color = NothingGray
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text(text = collection.note, color = NothingWhite, fontSize = 14.sp)
+                        Text(text = collection.note, style = AppType.bodySm, color = NothingWhite)
                     }
                 }
             }
@@ -238,10 +232,7 @@ fun CollectionDetailScreen(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "AUDIT TRAIL",
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        letterSpacing = 1.sp,
+                        style = AppType.labelMonoLarge,
                         color = NothingGray
                     )
 
@@ -274,10 +265,7 @@ fun CollectionDetailScreen(
                     ) {
                         Text(
                             text = "RECEIVE & OPEN WHATSAPP",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            letterSpacing = 0.5.sp,
+                            style = AppType.labelMonoLarge,
                             color = Color.Black
                         )
                     }
@@ -294,14 +282,12 @@ fun CollectionDetailScreen(
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "⚠️ CONFIRMATION OUTSTANDING",
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = NothingAmber,
-                                fontSize = 12.sp
+                                style = AppType.labelMono,
+                                color = NothingAmber
                             )
                             Text(
                                 text = "Did you tap Send in WhatsApp?",
-                                fontSize = 13.sp,
+                                style = AppType.bodySm,
                                 color = NothingGray
                             )
 
@@ -316,7 +302,7 @@ fun CollectionDetailScreen(
                                 ) {
                                     Icon(Icons.Default.Refresh, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("OPEN WA AGAIN", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingWhite)
+                                    Text("OPEN WA AGAIN", style = AppType.labelMono, color = NothingWhite)
                                 }
 
                                 Button(
@@ -327,7 +313,7 @@ fun CollectionDetailScreen(
                                 ) {
                                     Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("YES, SENT", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.Black)
+                                    Text("YES, SENT", style = AppType.labelMono, color = Color.Black)
                                 }
                             }
                         }
@@ -337,18 +323,16 @@ fun CollectionDetailScreen(
                 CollectionStatus.CONFIRMED -> {
                     Text(
                         text = "✓ This collection is confirmed and archived.",
-                        fontFamily = FontFamily.Monospace,
-                        color = NothingGreen,
-                        fontSize = 13.sp
+                        style = AppType.bodySm,
+                        color = NothingGreen
                     )
                 }
 
                 CollectionStatus.VOIDED -> {
                     Text(
                         text = "✕ This collection is voided.",
-                        fontFamily = FontFamily.Monospace,
-                        color = NothingRed,
-                        fontSize = 13.sp
+                        style = AppType.bodySm,
+                        color = NothingRed
                     )
                 }
             }
@@ -367,7 +351,7 @@ fun CollectionDetailScreen(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, tint = NothingGray, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("CORRECT ENTRY (VOID & REPLACE)", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingGray)
+                    Text("CORRECT ENTRY (VOID & REPLACE)", style = AppType.labelMono, color = NothingGray)
                 }
             }
 
@@ -397,7 +381,7 @@ fun CollectionDetailScreen(
             containerColor = NothingCardRaised,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
-            title = { Text("CORRECT ENTRY #${collection.id}", fontFamily = FontFamily.Monospace, color = NothingWhite) },
+            title = { Text("CORRECT ENTRY #${collection.id}", style = AppType.subheading, color = NothingWhite) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -457,12 +441,12 @@ fun CollectionDetailScreen(
                         contentColor = NothingWhite
                     )
                 ) {
-                    Text("VOID & REPLACE", fontFamily = FontFamily.Monospace, color = NothingWhite, fontWeight = FontWeight.Bold)
+                    Text("VOID & REPLACE", style = AppType.labelMonoLarge, color = NothingWhite)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showVoidDialog = false }) {
-                    Text("CANCEL", color = NothingGray)
+                    Text("CANCEL", style = AppType.labelMono, color = NothingGray)
                 }
             }
         )
@@ -497,12 +481,10 @@ private fun DetailRow(label: String, value: String, isError: Boolean = false) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, color = NothingGray, fontSize = 13.sp)
+        Text(text = label, style = AppType.bodySm, color = NothingGray)
         Text(
             text = value,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Medium,
-            fontSize = 13.sp,
+            style = AppType.labelMono,
             color = if (isError) NothingRed else NothingWhite
         )
     }

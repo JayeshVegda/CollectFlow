@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jayesh.cashcollect.data.local.dao.FrequentCombination
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.model.Customer
 import com.jayesh.cashcollect.domain.money.Paise
@@ -126,6 +127,7 @@ fun CollectRoute(
     val doneTodayList by viewModel.doneTodayList.collectAsStateWithLifecycle()
     val commissionRate by viewModel.commissionRate.collectAsStateWithLifecycle()
     val recentCustomers by viewModel.recentCustomers.collectAsStateWithLifecycle()
+    val frequentCombinations by viewModel.frequentCombinations.collectAsStateWithLifecycle()
 
     CollectionsScreen(
         todayStats = todayStats,
@@ -134,6 +136,7 @@ fun CollectRoute(
         doneTodayList = doneTodayList,
         commissionRatePerThousand = commissionRate,
         recentCustomers = recentCustomers,
+        frequentCombinations = frequentCombinations,
         initialOpenQuickCapture = initialOpenQuickCapture,
         quickCapturePrefill = quickCapturePrefill,
         onQuickCaptureDismissed = onQuickCaptureDismissed,
@@ -162,6 +165,7 @@ fun CollectionsScreen(
     doneTodayList: List<CollectionItem>,
     commissionRatePerThousand: Int,
     recentCustomers: List<Customer> = emptyList(),
+    frequentCombinations: List<FrequentCombination> = emptyList(),
     quickCapturePrefill: String = "",
     initialOpenQuickCapture: Boolean = false,
     onQuickCaptureDismissed: () -> Unit = {},
@@ -395,6 +399,7 @@ fun CollectionsScreen(
             sheetState = quickCaptureSheetState,
             commissionRatePerThousand = commissionRatePerThousand,
             recentCustomers = recentCustomers,
+            frequentCombinations = frequentCombinations,
             initialInput = quickCapturePrefill,
             onDismiss = {
                 isQuickCaptureOpen = false

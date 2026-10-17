@@ -7,33 +7,33 @@ import java.util.Calendar
 /**
  * The figures every widget shows, loaded in one place.
  *
- * All three providers previously duplicated this work: compute local midnight, load the entire
- * `collections` table, filter in Kotlin, total in Kotlin. That triplicated the definition of
- * "today" — the one definition a daily figure must not have three of — and made every widget
- * refresh O(entire history). The aggregation now happens in SQLite, once, and the three providers
- * share it.
+ * Totals are calculated directly inside SQLite via optimized index queries.
  */
 internal data class WidgetSnapshot(
     val todayTotalPaise: Long,
     val todayCommissionPaise: Long,
     val todayCount: Int,
-    val awaitingReportCount: Int
+    val awaitingReportCount: Int,
+    val pendingTotalPaise: Long,
+    val pendingCount: Int,
+    val pendingPartyCount: Int
 )
 
 /**
  * Loads the snapshot, or null when the database cannot be read.
- *
- * Null rather than an exception: a widget update runs inside the launcher's process, so a failure
- * here must leave the previous widget content alone rather than take the home screen down.
  */
 internal suspend fun loadWidgetSnapshot(context: Context): WidgetSnapshot? = runCatching {
     val dao = AppDatabase.getInstance(context).collectionDao()
     val totals = dao.realizedTotalsSince(startOfToday())
+    val pending = dao.pendingTotals()
     WidgetSnapshot(
         todayTotalPaise = totals.totalPaise,
         todayCommissionPaise = totals.commissionPaise,
         todayCount = totals.entryCount,
-        awaitingReportCount = dao.countAwaitingReport()
+        awaitingReportCount = dao.countAwaitingReport(),
+        pendingTotalPaise = pending.totalPaise,
+        pendingCount = pending.entryCount,
+        pendingPartyCount = pending.partyCount
     )
 }.getOrNull()
 

@@ -63,6 +63,7 @@ import com.jayesh.cashcollect.ui.party.PartyLedgerRoute
 import com.jayesh.cashcollect.ui.party.PartyLedgerViewModel
 import com.jayesh.cashcollect.ui.settings.SettingsRoute
 import com.jayesh.cashcollect.ui.settings.SettingsViewModel
+import com.jayesh.cashcollect.ui.theme.AppType
 import com.jayesh.cashcollect.ui.theme.CashCollectTheme
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
@@ -239,7 +240,9 @@ class MainActivity : ComponentActivity() {
                 val settingsViewModel: SettingsViewModel = viewModel(
                     factory = SettingsViewModel.Factory(
                         settingsRepo = app.settingsRepository,
-                        backupManager = app.backupManager
+                        collectionRepo = app.collectionRepository,
+                        csvExporter = app.csvExporter,
+                        csvImporter = app.csvImporter
                     )
                 )
 
@@ -416,7 +419,10 @@ class MainActivity : ComponentActivity() {
                             }
 
                             is Screen.Insights -> {
-                                InsightsScreen(collections = historyList)
+                                InsightsScreen(
+                                    collections = historyList,
+                                    onPartyClick = { customerId -> goTo(Screen.PartyLedger(customerId)) }
+                                )
                             }
 
                             is Screen.AddCollection -> {
@@ -542,27 +548,10 @@ class MainActivity : ComponentActivity() {
                                 SettingsRoute(
                                     viewModel = settingsViewModel,
                                     onBackupNow = {
-                                        scope.launch {
-                                            try {
-                                                val backupFile = app.backupManager.createEncryptedBackup()
-                                                val uri = FileProvider.getUriForFile(
-                                                    this@MainActivity,
-                                                    "${packageName}.fileprovider",
-                                                    backupFile
-                                                )
-                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                    type = "application/octet-stream"
-                                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                                }
-                                                startActivity(Intent.createChooser(shareIntent, "Export Encrypted Backup"))
-                                            } catch (e: Exception) {
-                                                Toast.makeText(this@MainActivity, "Backup failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
+                                        settingsViewModel.exportCsvBackup(this@MainActivity)
                                     },
                                     onRestoreBackup = { uri ->
-                                        settingsViewModel.restoreBackup(this@MainActivity, uri)
+                                        settingsViewModel.restoreFromCsv(this@MainActivity, uri)
                                     },
                                     onBackClick = goBack
                                 )
@@ -591,10 +580,9 @@ private fun androidx.compose.foundation.layout.RowScope.NavItem(
         label = {
             Text(
                 text = if (selected) "[ $label ]" else label,
-                fontFamily = FontFamily.Monospace,
+                style = AppType.labelMono,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 10.sp,
-                letterSpacing = 0.5.sp
+                fontSize = 10.sp
             )
         },
         colors = NavigationBarItemDefaults.colors(

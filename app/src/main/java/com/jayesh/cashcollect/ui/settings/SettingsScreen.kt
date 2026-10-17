@@ -199,9 +199,7 @@ fun SettingsScreen(
                             ) {
                                 Text(
                                     text = tag,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
+                                    style = AppType.labelMono,
                                     color = NothingWhite
                                 )
                             }
@@ -218,10 +216,7 @@ fun SettingsScreen(
 
                     Text(
                         text = "PREVIEW",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
+                        style = AppType.labelMono,
                         color = NothingGray
                     )
 
@@ -235,8 +230,7 @@ fun SettingsScreen(
                     ) {
                         Text(
                             text = previewMessage,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
+                            style = AppType.bodySm,
                             color = NothingWhite,
                             lineHeight = 18.sp
                         )
@@ -307,9 +301,7 @@ fun SettingsScreen(
                             ) {
                                 Text(
                                     text = if (preset == 0) "INSTANT" else "${preset / 1000}s",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
+                                    style = AppType.labelMono,
                                     color = NothingWhite
                                 )
                             }
@@ -339,39 +331,35 @@ fun SettingsScreen(
                 }
             }
 
-            SettingsHeader("DATA", "Export and encrypted backup")
+            SettingsHeader("DATA", "CSV Export & Lossless Restore")
 
             GlassSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Lock, contentDescription = null, tint = NothingWhite, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Save, contentDescription = null, tint = NothingGreen, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "ENCRYPTED BACKUP (AES-256)",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            letterSpacing = 0.5.sp,
+                            text = "CSV BACKUP & RESTORE",
+                            style = AppType.labelMonoLarge,
                             color = NothingWhite
                         )
                     }
 
                     Text(
                         text = "Last backup: ${settings.lastBackupAt?.let { dateFormat.format(Date(it)) } ?: "Never"}",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
+                        style = AppType.labelMono,
                         color = NothingGray
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                         AppPrimaryButton(
-                            label = "Back up now",
+                            label = "Export CSV",
                             onClick = onBackupNow,
                             modifier = Modifier.weight(1f)
                         )
 
                         AppOutlinedButton(
-                            label = "Restore",
+                            label = "Restore CSV",
                             icon = Icons.Default.Restore,
                             accent = TextDisplay,
                             onClick = { showRestoreConfirm = true },
@@ -383,13 +371,13 @@ fun SettingsScreen(
 
             GlassSurface(modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = NothingAmber, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = NothingGreen, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "All data is stored offline on this phone only. The encrypted backup can be " +
-                            "restored on this phone; it is locked to this phone's hardware key, so it " +
-                            "cannot currently be moved to a different phone.",
-                        fontSize = 12.sp,
+                        text = "All data is stored offline on your device. Backups are saved as clean CSV spreadsheets " +
+                            "with exact paise and rupees. You can easily share, inspect in Excel, or restore this " +
+                            "file onto any phone or test version with zero key restrictions.",
+                        style = AppType.bodySm,
                         color = NothingGray,
                         lineHeight = 18.sp
                     )
@@ -406,27 +394,27 @@ fun SettingsScreen(
             onDismissRequest = { showRestoreConfirm = false },
             containerColor = Color(0xFF1A1A1A),
             shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.border(1.dp, NothingRed, RoundedCornerShape(16.dp)),
-            title = { Text("RESTORE FROM BACKUP", fontFamily = FontFamily.Monospace, color = NothingWhite) },
+            modifier = Modifier.border(1.dp, NothingGreen, RoundedCornerShape(16.dp)),
+            title = { Text("RESTORE FROM CSV", style = AppType.subheading, color = NothingWhite) },
             text = {
                 Text(
-                    "Every entry currently in the app is replaced by the contents of the backup file. " +
-                        "Nothing is merged and the current entries are not kept. Pick the .enc file you " +
-                        "exported with BACK UP NOW.",
+                    "All entries in the app will be replaced with the contents of the chosen CSV file. " +
+                        "Pick the CSV file you exported with 'Export CSV'.",
+                    style = AppType.bodySm,
                     color = NothingGray
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     showRestoreConfirm = false
-                    restorePicker.launch(arrayOf("*/*"))
+                    restorePicker.launch(arrayOf("text/*", "*/*"))
                 }) {
-                    Text("CHOOSE FILE", color = NothingRed, fontWeight = FontWeight.Bold)
+                    Text("CHOOSE CSV FILE", color = NothingGreen, fontWeight = FontWeight.Bold, style = AppType.labelMono)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRestoreConfirm = false }) {
-                    Text("CANCEL", color = NothingGray)
+                    Text("CANCEL", color = NothingGray, style = AppType.labelMono)
                 }
             }
         )
@@ -438,7 +426,7 @@ fun SettingsScreen(
             containerColor = Color(0xFF1A1A1A),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.border(1.dp, NothingBorderVisible, RoundedCornerShape(16.dp)),
-            title = { Text("SAVED", fontFamily = FontFamily.Monospace, color = NothingWhite) },
+            title = { Text("SAVED", style = AppType.subheading, color = NothingWhite) },
             text = { Text("Settings updated.", color = NothingGray) },
             confirmButton = {
                 TextButton(onClick = { showSavedMessage = false }) {

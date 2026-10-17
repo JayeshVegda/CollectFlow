@@ -18,27 +18,32 @@
     <!-- Top bar -->
     <path
         android:pathData="M34,36 H74"
-        android:strokeColor="#FFFFFF"
+        android:strokeColor="#4A9E5C"
         android:strokeWidth="5.5"
         android:strokeLineCap="square" />
 
     <!-- Crossbar -->
     <path
         android:pathData="M34,52 H74"
-        android:strokeColor="#FFFFFF"
+        android:strokeColor="#4A9E5C"
         android:strokeWidth="5.5"
         android:strokeLineCap="square" />
 
     <!-- Bowl, bulging right of the stem -->
     <path
         android:pathData="M52,36 A8,8 0 0 1 52,52"
-        android:strokeColor="#FFFFFF"
+        android:strokeColor="#4A9E5C"
         android:strokeWidth="5.5" />
 
     <!-- Descending leg -->
     <path
         android:pathData="M52,52 L74,78"
-        android:strokeColor="#FFFFFF"
+        android:strokeColor="#4A9E5C"
         android:strokeWidth="5.5"
         android:strokeLineCap="square" />
+
+    <!-- Beta indicator dot in Nothing OS style -->
+    <path
+        android:pathData="M78,36 A3.5,3.5 0 1 1 78,35.9 Z"
+        android:fillColor="#4A9E5C" />
 </vector>

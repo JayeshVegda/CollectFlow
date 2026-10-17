@@ -88,6 +88,7 @@ fun QuickCaptureBottomSheet(
     sheetState: SheetState,
     commissionRatePerThousand: Int,
     recentCustomers: List<Customer> = emptyList(),
+    frequentCombinations: List<com.jayesh.cashcollect.data.local.dao.FrequentCombination> = emptyList(),
     initialInput: String = "",
     onDismiss: () -> Unit,
     onConfirmSave: (customerName: String, amountPaise: Long, note: String?) -> Unit,
@@ -214,6 +215,18 @@ fun QuickCaptureBottomSheet(
                 keyboardActions = KeyboardActions(onDone = { submit() })
             )
 
+            if (frequentCombinations.isNotEmpty()) {
+                PillRow(
+                    label = "MOST FREQUENT",
+                    values = frequentCombinations.map { combo ->
+                        "${combo.customerName} ${formatAmountShorthand(combo.amountPaise)}"
+                    },
+                    onPick = { fullString ->
+                        rawInput = fullString
+                    }
+                )
+            }
+
             if (recentCustomers.isNotEmpty()) {
                 PillRow(
                     label = "PARTY",
@@ -325,8 +338,31 @@ fun QuickCaptureBottomSheet(
     }
 }
 
-/** Amount shorthands, in the Indian business form the operator already types. */
-private val AMOUNT_PRESETS = listOf("50k", "1L", "2L", "4L", "5L", "10L", "20L", "50L")
+/** Amount shorthands requested by operator: 1L through 10L. */
+private val AMOUNT_PRESETS = listOf(
+    "1L", "1.5L", "1.8L", "2L", "2.5L", "3L", "3.5L",
+    "4L", "5L", "6L", "7L", "8L", "9L", "10L"
+)
+
+private fun formatAmountShorthand(paise: Long): String {
+    val lakhs = paise / 10_000_000.0
+    return if (lakhs >= 1.0) {
+        if (paise % 10_000_000L == 0L) {
+            "${paise / 10_000_000L}L"
+        } else {
+            val formatted = java.lang.String.format(java.util.Locale.US, "%.1f", lakhs).removeSuffix(".0")
+            "${formatted}L"
+        }
+    } else {
+        val thousands = paise / 100_000.0
+        if (paise % 100_000L == 0L) {
+            "${paise / 100_000L}k"
+        } else {
+            val formatted = java.lang.String.format(java.util.Locale.US, "%.1f", thousands).removeSuffix(".0")
+            "${formatted}k"
+        }
+    }
+}
 
 /**
  * A horizontally scrolling row of tappable pills with a small mono label above it.

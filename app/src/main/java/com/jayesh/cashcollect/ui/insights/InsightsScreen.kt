@@ -2,6 +2,8 @@ package com.jayesh.cashcollect.ui.insights
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,34 +16,48 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jayesh.cashcollect.domain.analytics.AnalyticsEngine
+import com.jayesh.cashcollect.domain.analytics.CustomerVolume
 import com.jayesh.cashcollect.domain.analytics.DailyTrendBucket
-import com.jayesh.cashcollect.domain.analytics.MonthlyBucket
+import com.jayesh.cashcollect.domain.analytics.InsightsTimeframe
 import com.jayesh.cashcollect.domain.model.CollectionItem
 import com.jayesh.cashcollect.domain.money.Paise
+import com.jayesh.cashcollect.ui.common.AmountText
 import com.jayesh.cashcollect.ui.common.AppScreenTitle
-import com.jayesh.cashcollect.ui.common.GlassMetricRow
 import com.jayesh.cashcollect.ui.common.GlassSurface
+import com.jayesh.cashcollect.ui.theme.AppType
+import com.jayesh.cashcollect.ui.theme.NothingAmber
+import com.jayesh.cashcollect.ui.theme.NothingAmberBg
+import com.jayesh.cashcollect.ui.theme.NothingAmberBorder
 import com.jayesh.cashcollect.ui.theme.NothingBlack
 import com.jayesh.cashcollect.ui.theme.NothingBorder
 import com.jayesh.cashcollect.ui.theme.NothingBorderVisible
@@ -51,20 +67,28 @@ import com.jayesh.cashcollect.ui.theme.NothingGreen
 import com.jayesh.cashcollect.ui.theme.NothingMuted
 import com.jayesh.cashcollect.ui.theme.NothingRed
 import com.jayesh.cashcollect.ui.theme.NothingWhite
+import com.jayesh.cashcollect.ui.theme.TextDisplay
+import com.jayesh.cashcollect.ui.theme.TextPrimary
+import com.jayesh.cashcollect.ui.theme.TextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InsightsScreen(
-    collections: List<CollectionItem>
+    collections: List<CollectionItem>,
+    onPartyClick: (Long) -> Unit = {}
 ) {
-    // Analytics makes several full passes over the ledger — day buckets, month buckets, a per-party
-    // map — and it was recomputed inside `remember` on the frame that draws this screen, for every
-    // database write. It now runs on a background dispatcher, keyed on the ledger it was given.
-    val emptyInsights = remember { AnalyticsEngine.computeInsights(emptyList()) }
-    val insights by produceState(initialValue = emptyInsights, key1 = collections) {
-        value = withContext(Dispatchers.Default) { AnalyticsEngine.computeInsights(collections) }
+    var selectedTimeframe by remember { mutableStateOf(InsightsTimeframe.TODAY) }
+
+    // Run computation asynchronously on background thread whenever collections or timeframe changes
+    val emptyStats = remember(selectedTimeframe) {
+        AnalyticsEngine.computeTimeframeStats(emptyList(), selectedTimeframe)
+    }
+    val stats by produceState(initialValue = emptyStats, key1 = collections, key2 = selectedTimeframe) {
+        value = withContext(Dispatchers.Default) {
+            AnalyticsEngine.computeTimeframeStats(collections, selectedTimeframe)
+        }
     }
 
     Scaffold(
@@ -83,10 +107,45 @@ fun InsightsScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 8.dp, bottom = 72.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item {
-                GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            // Timeframe Selector Chips
+            item(key = "timeframe_selector") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    InsightsTimeframe.values().forEach { tf ->
+                        val isSelected = selectedTimeframe == tf
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedTimeframe = tf },
+                            label = { Text(tf.label, style = AppType.labelMono) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = NothingCard,
+                                labelColor = NothingGray,
+                                selectedContainerColor = NothingWhite,
+                                selectedLabelColor = Color.Black
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = NothingBorderVisible,
+                                selectedBorderColor = NothingWhite
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Hero Financial KPI Card
+            item(key = "hero_kpi") {
+                GlassSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -94,185 +153,244 @@ fun InsightsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "TODAY REALIZED",
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                letterSpacing = 1.sp,
-                                color = NothingGray
+                                text = "${stats.timeframe.label} REALIZED",
+                                style = AppType.labelMono,
+                                color = TextSecondary
                             )
-                            if (insights.todayPendingCount > 0) {
+                            if (stats.pendingCount > 0) {
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(999.dp))
-                                        .border(1.dp, NothingBorderVisible, RoundedCornerShape(999.dp))
-                                        .background(Color(0x1AFFFFFF))
+                                        .background(NothingAmberBg)
+                                        .border(1.dp, NothingAmberBorder, RoundedCornerShape(999.dp))
                                         .padding(horizontal = 8.dp, vertical = 3.dp)
                                 ) {
                                     Text(
-                                        text = "${Paise(insights.todayPendingPaise).toFormattedRupees()} PENDING",
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = NothingGray,
-                                        letterSpacing = 0.5.sp
+                                        text = "${Paise(stats.pendingTotalPaise).toFormattedRupees()} PENDING (${stats.pendingCount})",
+                                        style = AppType.labelMono,
+                                        fontSize = 10.sp,
+                                        color = NothingAmber
                                     )
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = Paise(insights.todayTotalPaise).toFormattedRupees(),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 32.sp,
-                            color = NothingWhite
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        AmountText(
+                            amountPaise = stats.realizedTotalPaise,
+                            style = AppType.displayMoney,
+                            color = TextDisplay,
+                            align = androidx.compose.ui.text.style.TextAlign.Start
                         )
-                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Realized vs Pending Volume Split Bar
+                        if (stats.realizedTotalPaise > 0L || stats.pendingTotalPaise > 0L) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            val totalVolume = stats.realizedTotalPaise + stats.pendingTotalPaise
+                            val realizedFraction = (stats.realizedTotalPaise.toFloat() / totalVolume.toFloat()).coerceIn(0.02f, 1f)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(NothingBorder)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(realizedFraction)
+                                        .background(NothingGreen)
+                                )
+                                if (stats.pendingTotalPaise > 0L) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxSize()
+                                            .background(NothingAmber)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // 3 Sub-Metrics
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Metric("COMMISSION", Paise(insights.todayCommissionPaise).toFormattedRupees(), NothingGreen)
-                            Metric("TXNS", "${insights.todayCount}", NothingWhite)
-                            Metric("7D", Paise(insights.weeklyTotalPaise).toFormattedRupees(), NothingWhite)
+                            Column {
+                                Text("COMMISSION", style = AppType.labelMono, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                AmountText(
+                                    amountPaise = stats.commissionPaise,
+                                    style = AppType.amountLarge,
+                                    color = NothingGreen,
+                                    align = androidx.compose.ui.text.style.TextAlign.Start
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("TRANSACTIONS", style = AppType.labelMono, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "${stats.transactionCount}",
+                                    style = AppType.amountLarge,
+                                    color = NothingWhite
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("AVG / TXN", style = AppType.labelMono, color = TextSecondary)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                AmountText(
+                                    amountPaise = stats.avgTransactionPaise,
+                                    style = AppType.amountLarge,
+                                    color = NothingWhite
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            item {
-                GlassMetricRow(
-                    metrics = listOf(
-                        Triple("30D COLLECTED", Paise(insights.monthlyTotalPaise).toFormattedRupees(), NothingWhite),
-                        Triple("30D COMMISSION", Paise(insights.monthlyCommissionPaise).toFormattedRupees(), NothingGreen),
-                        Triple("AVG / DAY", Paise(insights.monthAvgPerDayPaise).toFormattedRupees(), NothingWhite)
-                    )
-                )
-            }
-
-            item {
-                GlassSurface(modifier = Modifier.fillMaxWidth()) {
+            // Volume Velocity (Daily Trend Bar Chart)
+            item(key = "velocity_chart") {
+                GlassSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
                     Column(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = "LAST 7 DAYS",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            letterSpacing = 1.sp,
-                            color = NothingGray
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        VolumeBarChart(buckets = insights.last7DaysTrend)
-                    }
-                }
-            }
-
-            item {
-                SectionLabel("MONTHLY")
-            }
-
-            items(insights.last6MonthsTrend) { bucket ->
-                MonthlyRow(bucket)
-            }
-
-            item {
-                SectionLabel("TOP COUNTERPARTIES")
-            }
-
-            if (insights.topCustomers.isEmpty()) {
-                item {
-                    Text(
-                        text = "No collection records yet.",
-                        fontFamily = FontFamily.Monospace,
-                        color = NothingMuted,
-                        fontSize = 13.sp
-                    )
-                }
-            } else {
-                items(insights.topCustomers) { customer ->
-                    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Text(
+                                text = "VOLUME VELOCITY (7D)",
+                                style = AppType.labelMonoLarge,
+                                color = NothingWhite
+                            )
+                            if (stats.peakDayLabel != null) {
                                 Text(
-                                    text = if (customer.customerAlias.isNullOrBlank()) customer.customerName else "${customer.customerName} (${customer.customerAlias})",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    color = NothingWhite
-                                )
-                                Text(
-                                    text = "${customer.transactionCount} transactions",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp,
+                                    text = stats.peakDayLabel!!,
+                                    style = AppType.labelMono,
                                     color = NothingGray
                                 )
                             }
-                            Text(
-                                text = Paise(customer.totalAmountPaise).toFormattedRupees(),
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = NothingWhite
-                            )
                         }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        VolumeBarChart(buckets = stats.trendBuckets)
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Bold,
-        fontSize = 12.sp,
-        letterSpacing = 1.sp,
-        color = NothingGray,
-        modifier = Modifier.padding(top = 4.dp)
-    )
-}
-
-@Composable
-private fun Metric(label: String, value: String, valueColor: Color) {
-    Column {
-        Text(label, fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = NothingGray)
-        Text(value, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = valueColor)
-    }
-}
-
-@Composable
-private fun MonthlyRow(bucket: MonthlyBucket) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(bucket.monthLabel, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = NothingWhite)
-                Text("${bucket.count} txns", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = NothingGray)
+            // Section Label for Counterparties
+            item(key = "counterparties_label") {
+                Text(
+                    text = "TOP COUNTERPARTIES (${stats.timeframe.label})",
+                    style = AppType.labelMonoLarge,
+                    color = NothingWhite,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = Paise(bucket.totalPaise).toFormattedRupees(),
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = NothingWhite
-                )
-                Text(
-                    text = "Comm ${Paise(bucket.commissionPaise).toFormattedRupees()}",
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    color = NothingGreen
-                )
+
+            // Top Counterparties List
+            if (stats.topCustomers.isEmpty()) {
+                item(key = "empty_counterparties") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No collection records in this timeframe.",
+                            style = AppType.bodySm,
+                            color = NothingMuted
+                        )
+                    }
+                }
+            } else {
+                val maxPartyPaise = stats.topCustomers.maxOfOrNull { it.totalAmountPaise } ?: 1L
+
+                items(stats.topCustomers, key = { it.customerId }) { customer ->
+                    val shareFraction = if (maxPartyPaise > 0L) {
+                        (customer.totalAmountPaise.toFloat() / maxPartyPaise.toFloat()).coerceIn(0.04f, 1f)
+                    } else 0f
+                    val totalVolume = stats.realizedTotalPaise
+                    val pctOfTotal = if (totalVolume > 0L) {
+                        (customer.totalAmountPaise.toDouble() / totalVolume.toDouble() * 100).toInt()
+                    } else 0
+
+                    GlassSurface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPartyClick(customer.customerId) },
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (customer.customerAlias.isNullOrBlank()) {
+                                            customer.customerName
+                                        } else {
+                                            "${customer.customerName} (${customer.customerAlias})"
+                                        },
+                                        style = AppType.subheading,
+                                        color = NothingWhite
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "${customer.transactionCount} txns · $pctOfTotal% of volume",
+                                        style = AppType.labelMono,
+                                        color = NothingGray
+                                    )
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    AmountText(
+                                        amountPaise = customer.totalAmountPaise,
+                                        style = AppType.amountLarge,
+                                        color = NothingWhite
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowForward,
+                                        contentDescription = "View Party Ledger",
+                                        tint = NothingGray,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Horizontal Share Bar
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(NothingBorder)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(shareFraction)
+                                        .background(NothingWhite)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -288,13 +406,13 @@ private fun VolumeBarChart(buckets: List<DailyTrendBucket>) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(110.dp),
+            .height(115.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom
     ) {
         for (bucket in buckets) {
-            val fraction = (bucket.totalPaise.toFloat() / maxAmount.toFloat()).coerceIn(0.08f, 1.0f)
-            val isToday = bucket.dayLabel == "Today"
+            val fraction = (bucket.totalPaise.toFloat() / maxAmount.toFloat()).coerceIn(0.06f, 1.0f)
+            val isToday = bucket.dayLabel.equals("Today", ignoreCase = true)
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -303,17 +421,27 @@ private fun VolumeBarChart(buckets: List<DailyTrendBucket>) {
                     .weight(1f)
                     .fillMaxHeight()
             ) {
+                if (bucket.totalPaise > 0L) {
+                    Text(
+                        text = Paise(bucket.totalPaise).toShortRupeeString(),
+                        style = AppType.labelMono,
+                        fontSize = 9.sp,
+                        color = if (isToday) NothingRed else NothingGray,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.55f)
                         .fillMaxHeight(fraction)
                         .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                        .background(if (isToday) NothingRed else if (bucket.totalPaise > 0) Color.White else NothingCard)
+                        .background(if (isToday) NothingRed else if (bucket.totalPaise > 0) NothingWhite else NothingBorderVisible)
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = bucket.dayLabel.take(3),
-                    fontFamily = FontFamily.Monospace,
+                    text = bucket.dayLabel.take(3).uppercase(),
+                    style = AppType.labelMono,
                     fontSize = 10.sp,
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                     color = if (isToday) NothingRed else NothingGray

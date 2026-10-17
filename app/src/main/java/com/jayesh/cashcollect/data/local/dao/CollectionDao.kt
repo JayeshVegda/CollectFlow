@@ -125,6 +125,27 @@ interface CollectionDao {
     @Query("SELECT COUNT(*) FROM collections WHERE status = 'RECEIPT_CONFIRMED'")
     suspend fun countAwaitingReport(): Int
 
+    @Query("""
+        SELECT cust.name AS customer_name, c.amount_paise, COUNT(*) AS frequency
+        FROM collections c
+        INNER JOIN customers cust ON c.customer_id = cust.id
+        WHERE c.status != 'VOIDED'
+        GROUP BY c.customer_id, c.amount_paise
+        ORDER BY frequency DESC, MAX(c.created_at) DESC
+        LIMIT :limit
+    """)
+    fun getFrequentCombinations(limit: Int = 8): Flow<List<FrequentCombination>>
+
+    @Query("""
+        SELECT
+            COALESCE(SUM(amount_paise), 0) AS total_paise,
+            COUNT(*) AS entry_count,
+            COUNT(DISTINCT customer_id) AS party_count
+        FROM collections
+        WHERE status = 'PENDING'
+    """)
+    suspend fun pendingTotals(): PendingTotals
+
     @Query("DELETE FROM collections WHERE id = :id")
     suspend fun deleteById(id: Long)
 
@@ -132,9 +153,23 @@ interface CollectionDao {
     suspend fun deleteAll()
 }
 
+/** Frequent party + amount combination for quick entry. */
+data class FrequentCombination(
+    @ColumnInfo(name = "customer_name") val customerName: String,
+    @ColumnInfo(name = "amount_paise") val amountPaise: Long,
+    @ColumnInfo(name = "frequency") val frequency: Int
+)
+
 /** Aggregate row returned by [CollectionDao.realizedTotalsSince]. */
 data class DayTotals(
     @ColumnInfo(name = "total_paise") val totalPaise: Long,
     @ColumnInfo(name = "commission_paise") val commissionPaise: Long,
     @ColumnInfo(name = "entry_count") val entryCount: Int
+)
+
+/** Aggregate row returned by [CollectionDao.pendingTotals]. */
+data class PendingTotals(
+    @ColumnInfo(name = "total_paise") val totalPaise: Long,
+    @ColumnInfo(name = "entry_count") val entryCount: Int,
+    @ColumnInfo(name = "party_count") val partyCount: Int
 )
