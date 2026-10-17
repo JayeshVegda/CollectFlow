@@ -46,7 +46,23 @@ The `.agents/skills/` directory equips agents with expert domain knowledge for A
 - **[compose-ui-testing-patterns](.agents/skills/compose-ui-testing-patterns/SKILL.md)**: Compose UI assertions, semantics interactions.
 - **[android-emulator-skill](.agents/skills/android-emulator-skill/SKILL.md)**: Automated emulator scripting, ADB navigation, screen mapping.
 
-### 6. Workflow & Planning
+### 6. Mobile App UI Design & Branding
+- **[mobile-app-ui-design](.agents/skills/mobile-app-ui-design/SKILL.md)**: Mobile interface design patterns and interaction flows.
+- **[logo-design](.agents/skills/logo-design/SKILL.md)**: App icon, logo geometry, and visual asset styling.
+- **[appllama-app-design-skill](.agents/skills/appllama-app-design-skill/SKILL.md)**: UI layout composition.
+
+### 7. Android Systems & Reverse Engineering
+- **[android-reverse-engineering](.agents/skills/android-reverse-engineering/SKILL.md)**: APK/AAR decompilation, calling chain analysis, and JNI/SO debugging.
+- **[integrate-adsdk](.agents/skills/integrate-adsdk/SKILL.md)**: Mobile ad network mediation and SDK integration patterns.
+
+### 8. Play Store Optimization (ASO) & Analytics
+- **[google-play-listing](.agents/skills/google-play-listing/SKILL.md)**: Play Store listing optimization and guidelines.
+- **[android-aso](.agents/skills/android-aso/SKILL.md)**: App Store Optimization for Android apps.
+- **[screenshot-optimization](.agents/skills/screenshot-optimization/SKILL.md)**: App screenshot layout and messaging.
+- **[app-icon-optimization](.agents/skills/app-icon-optimization/SKILL.md)**: App icon visual testing and conversion.
+- **[crash-analytics](.agents/skills/crash-analytics/SKILL.md)**: Crash tracking and stability metrics.
+
+### 9. Workflow & Planning
 - **[to-plan](.agents/skills/to-plan/SKILL.md)**: Step-by-step implementation planning.
 - **[deliver-spec](.agents/skills/deliver-spec/SKILL.md)**: Specification verification workflows.
 - **[shepherd](.agents/skills/shepherd/SKILL.md)**: Code review and verification practices.

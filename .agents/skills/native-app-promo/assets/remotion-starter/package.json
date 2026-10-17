@@ -1,0 +1,23 @@
+{
+  "name": "native-app-promo-remotion",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio --no-open",
+    "typecheck": "tsc --noEmit",
+    "still": "remotion still src/index.ts NativeAppPromo out/still.png --frame=180",
+    "render:preview": "remotion render src/index.ts NativeAppPromo out/preview.mp4 --codec=h264 --crf=22",
+    "render:commercial": "remotion render src/index.ts NativeAppPromo out/final.mp4 --codec=h264 --crf=16 --image-format=png --pixel-format=yuv420p --color-space=bt709 --x264-preset=slow"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.506",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.506"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.10",
+    "@types/react-dom": "19.1.7",
+    "typescript": "5.9.2"
+  }
+}

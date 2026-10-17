@@ -1,0 +1,4 @@
+interface:
+  display_name: "Native App Promo"
+  short_description: "Direct evidence-backed app films with mandatory native capture"
+  default_prompt: "Use $native-app-promo to inspect this native app, capture real simulator/emulator or authorized device UI, define its brand motion identity, and produce a polished product promo. Pause if native capture access is missing."
