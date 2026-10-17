@@ -650,7 +650,7 @@ private fun RowScope.AppleTabItem(
         contentAlignment = Alignment.Center
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.graphicsLayer {
                 scaleX = scale
