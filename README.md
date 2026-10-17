@@ -25,17 +25,29 @@ CollectFlow is a single-user, offline-first native Android app designed for high
   on a different phone. CSV export carries both exact paise integers and plain decimal rupees.
 - **Periodic Reminders:** WorkManager periodic reminder for unconfirmed collections awaiting WhatsApp confirmation.
 
+## What's New in v2.1.0 (Beta)
+- **Side-by-Side Coexistence (`.beta` package)**: Installs alongside your existing CollectFlow app with a distinct emerald green icon badge, allowing zero-risk testing without uninstalling or endangering your current ledger.
+- **Apple HIG Bottom Navigation**: Slim 52dp tab bar with subtle active capsules, fluid spring micro-interactions, 0.5dp borders, and tactile haptic feedback.
+- **Redesigned Insights Screen**: Ground-up Apple Wallet style hero card, iOS segmented time ranges (Today, 7D, Month, All Time), and Screen Time style counterparty breakdown.
+- **Quick Capture 2.0**: Most Frequent combination presets (`Sambhu 3l`, `Sambhu 1.5l`, etc.) computed directly from history, quick amount chips up to 10L, and clean non-intrusive keyboard behavior.
+- **Dynamic Launcher Widget**: Redesigned 4x2, 3x2, and 2x2 RemoteViews displaying live collected totals, pending balances, and instant action shortcuts.
+- **Simple CSV Backup & Restore**: Plain-text CSV export and import in Settings for seamless, cross-device or cross-version data migration.
+- **Refined Slim Typography**: Clean, modern typography and compact cards replacing heavy monospace styling.
+
 ## Template Tags
 `{name}` `{alias}` `{amount}` `{commission}` `{date}` `{time}` `{ref}` `{note}`
 
-## Installation
+## Installation & Migration
 
 Every commit to `main` automatically triggers GitHub Actions to build and publish fresh APKs.
 
 1. Download the latest build from [Releases](https://github.com/JayeshVegda/CollectFlow/releases/tag/latest):
    - **CollectFlow-release.apk**: Optimized, R8-minified production build.
    - **CollectFlow-debug.apk**: Debug build.
-2. Install via ADB or directly on your phone:
+2. Install directly on your phone:
    ```bash
    adb install -r CollectFlow-release.apk
    ```
+3. **Migrating Data from Older CollectFlow**:
+   - In your existing CollectFlow app: Navigate to **Settings** → **Backup** / **Export CSV** to save your records.
+   - In CollectFlow Beta: Navigate to **Settings** → **Import CSV** to instantly load your parties and history.

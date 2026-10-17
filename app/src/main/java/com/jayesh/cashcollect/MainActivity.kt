@@ -17,19 +17,36 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarDefaults
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -355,42 +372,10 @@ class MainActivity : ComponentActivity() {
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     bottomBar = {
                         if (isRootTab) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(width = 1.dp, color = NothingBorder, shape = RectangleShape)
-                            ) {
-                                NavigationBar(
-                                    containerColor = NothingBlack,
-                                    tonalElevation = 0.dp,
-                                    windowInsets = NavigationBarDefaults.windowInsets
-                                ) {
-                                    NavItem(
-                                        selected = currentScreen is Screen.Collections,
-                                        label = "Collect",
-                                        icon = { Icon(Icons.Default.List, contentDescription = "Collections") },
-                                        onClick = { goTo(Screen.Collections) }
-                                    )
-                                    NavItem(
-                                        selected = currentScreen is Screen.Insights,
-                                        label = "Insights",
-                                        icon = { Icon(Icons.Default.Analytics, contentDescription = "Insights") },
-                                        onClick = { goTo(Screen.Insights) }
-                                    )
-                                    NavItem(
-                                        selected = currentScreen is Screen.History,
-                                        label = "History",
-                                        icon = { Icon(Icons.Default.History, contentDescription = "History") },
-                                        onClick = { goTo(Screen.History) }
-                                    )
-                                    NavItem(
-                                        selected = currentScreen is Screen.Settings,
-                                        label = "Settings",
-                                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                                        onClick = { goTo(Screen.Settings) }
-                                    )
-                                }
-                            }
+                            AppleBottomNavigationBar(
+                                currentScreen = currentScreen,
+                                onNavigate = { screen -> goTo(screen) }
+                            )
                         }
                     }
                 ) { innerPadding ->
@@ -567,30 +552,134 @@ class MainActivity : ComponentActivity() {
 
 
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.NavItem(
+private fun AppleBottomNavigationBar(
+    currentScreen: Screen,
+    onNavigate: (Screen) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalHapticFeedback.current
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = Color(0xF5101012),
+        tonalElevation = 0.dp
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(Color(0xFF222226))
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .height(52.dp)
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AppleTabItem(
+                    selected = currentScreen is Screen.Collections,
+                    label = "Collect",
+                    icon = Icons.Default.ReceiptLong,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onNavigate(Screen.Collections)
+                    }
+                )
+                AppleTabItem(
+                    selected = currentScreen is Screen.Insights,
+                    label = "Insights",
+                    icon = Icons.Default.Analytics,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onNavigate(Screen.Insights)
+                    }
+                )
+                AppleTabItem(
+                    selected = currentScreen is Screen.History,
+                    label = "History",
+                    icon = Icons.Default.History,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onNavigate(Screen.History)
+                    }
+                )
+                AppleTabItem(
+                    selected = currentScreen is Screen.Settings,
+                    label = "Settings",
+                    icon = Icons.Default.Settings,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onNavigate(Screen.Settings)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.AppleTabItem(
     selected: Boolean,
     label: String,
-    icon: @Composable () -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit
 ) {
-    NavigationBarItem(
-        selected = selected,
-        onClick = onClick,
-        icon = icon,
-        label = {
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.0f else 0.94f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "tab_scale"
+    )
+    val contentColor = if (selected) NothingWhite else Color(0xFF71717A)
+
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(if (selected) Color(0xFF1E1E24) else Color.Transparent)
+                    .padding(horizontal = 14.dp, vertical = 3.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = contentColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
                 style = AppType.labelSm,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                fontSize = 11.sp
+                fontSize = 10.5.sp,
+                color = contentColor,
+                maxLines = 1
             )
-        },
-        colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = NothingWhite,
-            selectedTextColor = NothingWhite,
-            indicatorColor = Color.Transparent,
-            unselectedIconColor = NothingMuted,
-            unselectedTextColor = NothingMuted
-        )
-    )
+        }
+    }
 }
