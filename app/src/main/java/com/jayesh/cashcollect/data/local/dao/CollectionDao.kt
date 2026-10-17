@@ -130,7 +130,7 @@ interface CollectionDao {
         FROM collections c
         INNER JOIN customers cust ON c.customer_id = cust.id
         WHERE c.status != 'VOIDED'
-        GROUP BY c.customer_id, c.amount_paise
+        GROUP BY c.customer_id, cust.name, c.amount_paise
         ORDER BY frequency DESC, MAX(c.created_at) DESC
         LIMIT :limit
     """)

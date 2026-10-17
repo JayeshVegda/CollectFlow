@@ -74,6 +74,13 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             echo "=== TEST LOG FAILURE OUTPUT ==="
             cat test_log.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout -B debug-log
+            cp test_log.txt ci_failure.log
+            git add ci_failure.log
+            git commit -m "ci: test failure log" || true
+            git push -f origin debug-log || true
             exit 1
           }
 
